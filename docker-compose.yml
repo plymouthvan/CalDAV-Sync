@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  caldav-sync:
+    build: .
+    container_name: caldav-sync-microservice
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Server Configuration
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - BASE_URL=http://localhost:8000
+      
+      # Database Configuration
+      - DATABASE_URL=sqlite:///./data/caldav_sync.db
+      - DATABASE_ECHO=false
+      
+      # Security Configuration (CHANGE THESE IN PRODUCTION!)
+      - SECRET_KEY=your-secret-key-change-this-in-production
+      - ENCRYPTION_KEY=your-32-character-encryption-key-here
+      - API_KEY=your-api-key-for-external-access
+      
+      # Google OAuth Configuration (SET THESE FOR GOOGLE CALENDAR ACCESS)
+      - GOOGLE_CLIENT_ID=your-google-client-id
+      - GOOGLE_CLIENT_SECRET=your-google-client-secret
+      
+      # Sync Configuration
+      - DEFAULT_SYNC_INTERVAL_MINUTES=5
+      - DEFAULT_SYNC_WINDOW_DAYS=30
+      - MAX_CONCURRENT_MAPPINGS=5
+      
+      # Logging Configuration
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      
+      # API Configuration
+      - API_RATE_LIMIT_PER_MINUTE=60
+      - API_ENABLE_CORS=true
+      
+      # CalDAV Configuration
+      - CALDAV_CONNECTION_TIMEOUT=30
+      - CALDAV_READ_TIMEOUT=60
+      - CALDAV_VERIFY_SSL=true
+      
+      # Webhook Configuration
+      - WEBHOOK_TIMEOUT_SECONDS=30
+      - WEBHOOK_MAX_RETRIES=3
+    volumes:
+      # Persist database and configuration
+      - caldav_data:/app/data
+      # Optional: Mount custom config file
+      # - ./config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/status')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.caldav-sync.rule=Host(`calendar-sync.example.com`)"
+      - "traefik.http.routers.caldav-sync.tls=true"
+      - "traefik.http.routers.caldav-sync.tls.certresolver=letsencrypt"
+      - "traefik.http.services.caldav-sync.loadbalancer.server.port=8000"
+
+volumes:
+  caldav_data:
+    driver: local
+
+networks:
+  default:
+    name: caldav-sync-network
