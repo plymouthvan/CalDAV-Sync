@@ -133,6 +133,7 @@ class UIConfig(BaseSettings):
 
 class DevelopmentConfig(BaseSettings):
     """Development-only configuration."""
+    debug: bool = Field(default=False, env="DEBUG")
     mock_caldav: bool = Field(default=False, env="DEV_MOCK_CALDAV")
     mock_google: bool = Field(default=False, env="DEV_MOCK_GOOGLE")
     log_all_requests: bool = Field(default=False, env="DEV_LOG_ALL_REQUESTS")

@@ -171,6 +171,41 @@ This journal tracks the development progress, decisions, challenges, and solutio
 
 ---
 
+### Entry 13
+**Date**: 2025-07-30 20:23
+**Component**: DigitalOcean Deployment Issues Resolution
+**Attempted**: Debug and resolve multiple deployment issues affecting DigitalOcean droplet deployment including JSON serialization errors, missing OAuth UI, and API key security middleware problems
+**Issue**: Several critical issues preventing proper deployment:
+1. **JSON Serialization Errors**: `TypeError: Object of type datetime is not JSON serializable` causing cascading 500 errors in error handlers
+2. **Missing Google OAuth Authorization Flow**: No user-facing interface to initiate OAuth authentication after ClientID/Secret configuration
+3. **API Key Security Middleware**: Incorrect handling of reverse proxy scenarios causing legitimate requests to be blocked
+4. **Configuration API Errors**: Multiple attribute errors in status endpoints due to config structure mismatches
+5. **Datetime Serialization**: Inconsistent datetime handling throughout the application
+
+**Solution**: Systematic debugging approach with comprehensive fixes:
+1. **Fixed JSON Serialization**: Replaced `ErrorResponse().dict()` calls with direct dictionary creation using `datetime.utcnow().isoformat()` in all error handlers
+2. **Enhanced Google OAuth UI**:
+   - Fixed API endpoint mismatches between frontend JavaScript and backend routes
+   - Added missing `/auth/status`, `/auth/url`, `/auth/refresh`, `/auth/revoke`, and `/test` endpoint aliases
+   - Fixed OAuth callback redirect handling to properly redirect to `/google` page with success/error status
+   - Added root-level `/oauth/callback` route to handle Google's redirect requirements
+3. **Improved Security Middleware**:
+   - Enhanced reverse proxy detection to distinguish between direct connections and proxy scenarios
+   - Updated `is_localhost()` function to be more restrictive for deployment security
+   - Added `is_internal_network()` helper for better proxy handling
+   - Improved logging for security decisions
+4. **Fixed Configuration Issues**:
+   - Added missing `debug` attribute to `DevelopmentConfig` class
+   - Fixed `max_concurrent_syncs` → `max_concurrent_mappings` attribute name mismatch
+   - Updated status API to use correct config attribute paths
+5. **Validated Datetime Serialization**: Confirmed all datetime objects are properly serialized using `.isoformat()` throughout the application
+
+**Result**: All deployment issues resolved - application now runs without JSON serialization errors, provides complete OAuth authorization flow, handles reverse proxy scenarios correctly, and maintains proper security boundaries.
+
+**Notes**: The debugging process revealed the complexity of deployment environments vs development. Key insights: 1) Error handlers must never fail themselves, 2) Reverse proxy scenarios require careful IP address handling, 3) Frontend-backend API contracts must be precisely matched, 4) Configuration validation is critical for deployment success. The OAuth flow now works end-to-end, though Google Cloud Console redirect URI configuration is still required for full functionality.
+
+---
+
 ## Project Completion Status
 
 ### Final Implementation Summary

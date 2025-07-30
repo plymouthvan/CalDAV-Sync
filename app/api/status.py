@@ -214,8 +214,8 @@ async def get_version_info(
             "version": "1.0.0",
             "build_date": "2025-07-30",
             "python_version": "3.11+",
-            "environment": settings.environment,
-            "debug_mode": settings.development.debug,
+            "environment": "production" if not settings.server.debug else "development",
+            "debug_mode": settings.server.debug,
             "api_docs_enabled": settings.development.enable_api_docs,
             "features": {
                 "caldav_sync": True,
@@ -243,7 +243,7 @@ async def get_configuration_info(
         settings = get_settings()
         
         return {
-            "environment": settings.environment,
+            "environment": "production" if not settings.server.debug else "development",
             "database": {
                 "type": "SQLite",
                 "path": settings.database.url.replace("sqlite:///", "")
@@ -251,7 +251,7 @@ async def get_configuration_info(
             "sync": {
                 "default_interval_minutes": settings.sync.default_interval_minutes,
                 "default_sync_window_days": settings.sync.default_sync_window_days,
-                "max_concurrent_syncs": settings.sync.max_concurrent_syncs
+                "max_concurrent_mappings": settings.sync.max_concurrent_mappings
             },
             "api": {
                 "rate_limit_per_minute": settings.api.rate_limit_per_minute,

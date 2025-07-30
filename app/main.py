@@ -6,6 +6,7 @@ Configures the FastAPI app with all routers, middleware, and startup/shutdown ev
 
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -168,6 +169,14 @@ def create_app() -> FastAPI:
     # Include UI router
     app.include_router(ui_router)
     
+    # Add OAuth callback route at root level for Google OAuth
+    @app.get("/oauth/callback")
+    async def oauth_callback_redirect(request: Request):
+        """Redirect OAuth callback to the API endpoint."""
+        from fastapi.responses import RedirectResponse
+        query_params = str(request.url.query)
+        return RedirectResponse(url=f"/api/google/oauth/callback?{query_params}")
+    
     # Mount static files (for web UI)
     try:
         app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -190,10 +199,11 @@ def add_exception_handlers(app: FastAPI):
         logger.warning(f"CalDAV error: {exc}")
         return JSONResponse(
             status_code=400,
-            content=ErrorResponse(
-                error="CalDAV Error",
-                detail=str(exc)
-            ).dict()
+            content={
+                "error": "CalDAV Error",
+                "detail": str(exc),
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(GoogleCalendarError)
@@ -202,10 +212,11 @@ def add_exception_handlers(app: FastAPI):
         logger.warning(f"Google Calendar error: {exc}")
         return JSONResponse(
             status_code=400,
-            content=ErrorResponse(
-                error="Google Calendar Error",
-                detail=str(exc)
-            ).dict()
+            content={
+                "error": "Google Calendar Error",
+                "detail": str(exc),
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(SyncError)
@@ -214,10 +225,11 @@ def add_exception_handlers(app: FastAPI):
         logger.error(f"Sync error: {exc}")
         return JSONResponse(
             status_code=500,
-            content=ErrorResponse(
-                error="Sync Error",
-                detail=str(exc)
-            ).dict()
+            content={
+                "error": "Sync Error",
+                "detail": str(exc),
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(AuthenticationError)
@@ -226,10 +238,11 @@ def add_exception_handlers(app: FastAPI):
         logger.warning(f"Authentication error: {exc}")
         return JSONResponse(
             status_code=401,
-            content=ErrorResponse(
-                error="Authentication Error",
-                detail=str(exc)
-            ).dict()
+            content={
+                "error": "Authentication Error",
+                "detail": str(exc),
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(AuthorizationError)
@@ -238,10 +251,11 @@ def add_exception_handlers(app: FastAPI):
         logger.warning(f"Authorization error: {exc}")
         return JSONResponse(
             status_code=403,
-            content=ErrorResponse(
-                error="Authorization Error",
-                detail=str(exc)
-            ).dict()
+            content={
+                "error": "Authorization Error",
+                "detail": str(exc),
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(ValueError)
@@ -250,21 +264,24 @@ def add_exception_handlers(app: FastAPI):
         logger.warning(f"Validation error: {exc}")
         return JSONResponse(
             status_code=400,
-            content=ErrorResponse(
-                error="Validation Error",
-                detail=str(exc)
-            ).dict()
+            content={
+                "error": "Validation Error",
+                "detail": str(exc),
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(404)
     async def not_found_handler(request: Request, exc: HTTPException):
         """Handle 404 errors."""
+        logger.warning(f"404 error for path: {request.url.path}")
         return JSONResponse(
             status_code=404,
-            content=ErrorResponse(
-                error="Not Found",
-                detail="The requested resource was not found"
-            ).dict()
+            content={
+                "error": "Not Found",
+                "detail": "The requested resource was not found",
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
     
     @app.exception_handler(500)
@@ -273,10 +290,11 @@ def add_exception_handlers(app: FastAPI):
         logger.error(f"Internal server error: {exc}")
         return JSONResponse(
             status_code=500,
-            content=ErrorResponse(
-                error="Internal Server Error",
-                detail="An unexpected error occurred"
-            ).dict()
+            content={
+                "error": "Internal Server Error",
+                "detail": "An unexpected error occurred",
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
 
 

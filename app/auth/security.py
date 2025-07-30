@@ -37,16 +37,35 @@ def is_localhost(host: str) -> bool:
         if ip.is_loopback:
             return True
         
-        # Check if it's a private/internal network address
-        # This includes Docker networks (172.x.x.x), private networks (192.168.x.x, 10.x.x.x)
-        if ip.is_private:
-            return True
-            
+        # For deployment behind reverse proxy, we need to be more restrictive
+        # Only consider true localhost/loopback as internal
+        # Docker networks and private networks should be treated as external
+        # when behind a reverse proxy to ensure proper API key validation
+        
         return False
     
     except ValueError:
         # Not a valid IP address, check if it's localhost hostname
         return host.lower() == 'localhost'
+
+def is_internal_network(host: str) -> bool:
+    """
+    Check if the given host is from an internal/private network.
+    This is separate from localhost to handle reverse proxy scenarios.
+    
+    Args:
+        host: Host address to check
+        
+    Returns:
+        True if host is from internal network, False otherwise
+    """
+    try:
+        ip = ipaddress.ip_address(host)
+        # Check if it's a private/internal network address
+        # This includes Docker networks (172.x.x.x), private networks (192.168.x.x, 10.x.x.x)
+        return ip.is_private
+    except ValueError:
+        return False
 
 
 def get_client_host(request: Request) -> str:
@@ -79,6 +98,7 @@ def require_api_key_unless_localhost(
 ) -> bool:
     """
     Require API key for non-localhost requests.
+    Handles reverse proxy scenarios by checking the actual client IP.
     
     Args:
         request: FastAPI request object
@@ -92,15 +112,27 @@ def require_api_key_unless_localhost(
     """
     settings = get_settings()
     client_host = get_client_host(request)
+    direct_host = request.client.host if request.client else 'unknown'
     
-    # Allow localhost without API key
-    if is_localhost(client_host):
+    # Allow true localhost requests (direct connection)
+    if is_localhost(client_host) and is_localhost(direct_host):
         logger.debug(f"Allowing localhost request from {client_host}")
         return True
     
+    # For reverse proxy scenarios, check if this is an internal network request
+    # but still require API key for external clients
+    if is_internal_network(direct_host) and client_host != direct_host:
+        # This is likely a reverse proxy scenario
+        logger.debug(f"Reverse proxy detected: direct={direct_host}, client={client_host}")
+        
+        # If the actual client (from headers) is localhost, allow it
+        if is_localhost(client_host):
+            logger.debug(f"Allowing localhost client via reverse proxy: {client_host}")
+            return True
+    
     # Require API key for external requests
     if not settings.security.api_key:
-        logger.warning("API key not configured but external request received")
+        logger.warning(f"API key not configured but external request received from {client_host}")
         raise HTTPException(
             status_code=401,
             detail="API key authentication required but not configured"

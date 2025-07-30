@@ -62,7 +62,8 @@ async def oauth_callback(
     try:
         if error:
             logger.warning(f"OAuth callback received error: {error}")
-            raise HTTPException(status_code=400, detail=f"OAuth error: {error}")
+            # Redirect to Google auth page with error
+            return RedirectResponse(url=f"/google?error={error}")
         
         oauth_manager = get_oauth_manager()
         oauth_manager.exchange_code_for_tokens(code, state)
@@ -71,24 +72,21 @@ async def oauth_callback(
         success, error_message = oauth_manager.test_credentials()
         if not success:
             logger.error(f"OAuth credentials test failed: {error_message}")
-            raise HTTPException(status_code=400, detail=f"OAuth setup failed: {error_message}")
+            return RedirectResponse(url=f"/google?error=test_failed")
         
         logger.info("Google OAuth authentication completed successfully")
         
-        # Redirect to success page or return success response
-        settings = get_settings()
-        if hasattr(settings.google, 'oauth_success_redirect') and settings.google.oauth_success_redirect:
-            return RedirectResponse(url=settings.google.oauth_success_redirect)
-        else:
-            return {"message": "Google OAuth authentication successful"}
+        # Redirect to Google auth page with success
+        return RedirectResponse(url="/google?success=true")
         
     except HTTPException:
         raise
     except GoogleOAuthError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"OAuth error: {e}")
+        return RedirectResponse(url=f"/google?error=oauth_failed")
     except Exception as e:
         logger.error(f"OAuth callback failed: {e}")
-        raise HTTPException(status_code=500, detail="OAuth callback processing failed")
+        return RedirectResponse(url=f"/google?error=callback_failed")
 
 
 @router.get("/oauth/token", response_model=OAuthTokenInfo)
@@ -256,15 +254,19 @@ async def get_google_calendar(
         raise HTTPException(status_code=500, detail="Failed to retrieve Google calendar")
 
 
-@router.get("/status")
-async def get_google_status(
+@router.get("/auth/status")
+async def get_google_auth_status(
     request: Request,
     _: bool = Depends(require_api_key_unless_localhost),
     __: bool = Depends(check_rate_limit)
 ):
-    """Get Google integration status."""
+    """Get Google authentication status."""
     try:
         oauth_manager = get_oauth_manager()
+        
+        # Check if credentials are configured
+        settings = get_settings()
+        has_credentials = bool(settings.google.client_id and settings.google.client_secret)
         
         # Get token info
         token_info = oauth_manager.get_token_info()
@@ -289,9 +291,11 @@ async def get_google_status(
                 logger.warning(f"Failed to count calendars: {e}")
         
         return {
+            "has_credentials": has_credentials,
             "authenticated": bool(token_info and token_info.get('has_token')),
             "credentials_valid": credentials_valid,
             "credentials_error": credentials_error,
+            "token_valid": credentials_valid and not token_info.get('is_expired', True) if token_info else False,
             "token_expired": token_info.get('is_expired', True) if token_info else True,
             "token_expires_at": token_info.get('expires_at') if token_info else None,
             "scopes": token_info.get('scopes', []) if token_info else [],
@@ -300,8 +304,59 @@ async def get_google_status(
         }
         
     except Exception as e:
-        logger.error(f"Failed to get Google status: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve Google status")
+        logger.error(f"Failed to get Google auth status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve Google auth status")
+
+@router.get("/auth/url")
+async def get_oauth_url(
+    request: Request,
+    state: Optional[str] = Query(None, description="Optional state parameter for CSRF protection"),
+    _: bool = Depends(require_api_key_unless_localhost),
+    __: bool = Depends(check_rate_limit)
+):
+    """Get Google OAuth authorization URL (alias for authorize endpoint)."""
+    try:
+        oauth_manager = get_oauth_manager()
+        authorization_url = oauth_manager.get_authorization_url(state)
+        
+        return {
+            "auth_url": authorization_url,
+            "state": state
+        }
+        
+    except GoogleOAuthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to generate OAuth authorization URL: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate authorization URL")
+
+@router.post("/auth/refresh")
+async def refresh_oauth_token_alias(
+    request: Request,
+    _: bool = Depends(require_api_key_unless_localhost),
+    __: bool = Depends(check_rate_limit)
+):
+    """Alias for refresh-token endpoint."""
+    return await refresh_oauth_token(request, _, __)
+
+@router.post("/auth/revoke")
+async def revoke_oauth_token_alias(
+    request: Request,
+    _: bool = Depends(require_api_key_unless_localhost),
+    __: bool = Depends(check_rate_limit)
+):
+    """Alias for revoke endpoint."""
+    await revoke_oauth_token(request, _, __)
+    return {"message": "Authentication revoked successfully"}
+
+@router.post("/test")
+async def test_oauth_credentials_alias(
+    request: Request,
+    _: bool = Depends(require_api_key_unless_localhost),
+    __: bool = Depends(check_rate_limit)
+):
+    """Alias for oauth/test endpoint."""
+    return await test_oauth_credentials(request, _, __)
 
 
 @router.post("/refresh-token")
