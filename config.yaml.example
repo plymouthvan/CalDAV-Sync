@@ -1,0 +1,88 @@
+# CalDAV Sync Microservice Configuration
+# Configuration precedence: ENV vars → config.yaml → database settings → defaults
+# Copy this file to config.yaml and customize as needed
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  reload: false
+  base_url: "https://calendar-sync.example.com"
+
+# Database Configuration
+database:
+  url: "sqlite:///./caldav_sync.db"
+  echo: false  # Set to true for SQL query logging
+
+# Google OAuth Configuration
+google:
+  client_id: "your-google-client-id-here"
+  client_secret: "your-google-client-secret-here"
+  scopes:
+    - "https://www.googleapis.com/auth/calendar"
+  redirect_uri: "/oauth/callback"
+
+# Security Configuration
+security:
+  api_key: "your-secure-api-key-here"
+  secret_key: "your-secret-key-for-session-encryption"
+  encryption_key: "your-fernet-encryption-key-for-credentials"
+  require_auth_for_external: true
+
+# Sync Configuration
+sync:
+  default_interval_minutes: 5
+  default_sync_window_days: 30
+  max_concurrent_mappings: 5
+  batch_size: 100
+  retry_attempts: 3
+  retry_delay_seconds: 60
+
+# Webhook Configuration
+webhooks:
+  timeout_seconds: 30
+  max_retries: 3
+  retry_delays: [30, 300, 1800]  # 30s, 5m, 30m
+  include_event_details: true
+
+# API Configuration
+api:
+  rate_limit_per_minute: 60
+  enable_cors: true
+  cors_origins:
+    - "http://localhost:3000"
+    - "https://calendar-sync.example.com"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"  # or "text"
+  log_webhook_failures: true
+  log_conflict_resolutions: true
+  log_sync_summaries: true
+
+# CalDAV Configuration
+caldav:
+  connection_timeout: 30
+  read_timeout: 60
+  max_retries: 3
+  verify_ssl: true
+
+# Google Calendar Configuration
+google_calendar:
+  batch_size: 50
+  rate_limit_delay: 0.1  # seconds between requests
+  max_results_per_request: 2500
+
+# UI Configuration
+ui:
+  theme: "light"  # or "dark"
+  items_per_page: 20
+  auto_refresh_interval: 30  # seconds
+
+# Development Configuration (only used when debug=true)
+development:
+  mock_caldav: false
+  mock_google: false
+  log_all_requests: false
