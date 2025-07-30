@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.database import get_db, CalendarMapping, SyncLog
 from app.sync.scheduler import get_sync_scheduler
@@ -34,19 +35,28 @@ async def health_check(
         # Test database connection
         database_connected = True
         try:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
             database_connected = False
         
-        # Check Google authentication
+        # Check Google authentication and configuration
         google_authenticated = False
+        google_configured = False
+        google_auth_error = None
         try:
-            oauth_manager = get_oauth_manager()
-            credentials = oauth_manager.get_valid_credentials()
-            google_authenticated = bool(credentials)
+            settings = get_settings()
+            google_configured = bool(settings.google.client_id and settings.google.client_secret)
+            
+            if google_configured:
+                oauth_manager = get_oauth_manager()
+                credentials = oauth_manager.get_valid_credentials()
+                google_authenticated = bool(credentials)
+            else:
+                google_auth_error = "Google OAuth credentials not configured"
         except Exception as e:
             logger.warning(f"Google auth check failed: {e}")
+            google_auth_error = str(e)
         
         # Check scheduler status
         scheduler_running = False
@@ -76,11 +86,19 @@ async def health_check(
             logger.warning(f"Last sync times check failed: {e}")
         
         # Determine overall status
+        # System is healthy if core components are working
+        # Google auth is not required for basic system health
         if database_connected and scheduler_running:
-            status = "healthy"
+            if google_configured:
+                status = "healthy"
+            else:
+                # System works but needs configuration
+                status = "needs_setup"
         elif database_connected:
+            # Database works but scheduler has issues - still partially functional
             status = "degraded"
         else:
+            # Database connection failed - this is a critical issue
             status = "unhealthy"
         
         return HealthCheckResponse(
@@ -88,6 +106,8 @@ async def health_check(
             timestamp=datetime.utcnow(),
             database_connected=database_connected,
             google_authenticated=google_authenticated,
+            google_configured=google_configured,
+            google_auth_error=google_auth_error,
             scheduler_running=scheduler_running,
             active_mappings=active_mappings,
             last_sync_times=last_sync_times

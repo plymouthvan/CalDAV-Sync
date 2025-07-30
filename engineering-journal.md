@@ -139,6 +139,38 @@ This journal tracks the development progress, decisions, challenges, and solutio
 
 ---
 
+### Entry 12
+**Date**: 2025-07-30 19:44
+**Component**: User Experience Improvements and Dashboard Health Status
+**Attempted**: Improve user experience by fixing "Unhealthy" system status and 500 errors in production environment
+**Issue**: Multiple UX issues identified from production logs:
+1. **SQLAlchemy Deprecation Warning**: `Textual SQL expression 'SELECT 1' should be explicitly declared as text('SELECT 1')` cluttering logs
+2. **Missing HTML Templates**: 500 Internal Server Errors when accessing `/status` and `/google` pages due to missing `system_status.html` and `google_auth.html` templates
+3. **Misleading Health Status**: System showing "Unhealthy" when core services were actually running fine, but Google OAuth wasn't configured
+4. **API Authentication Issues**: Dashboard API calls from Docker internal network (`172.18.0.1`) being treated as external requests, causing "Missing API key" warnings
+5. **Poor User Feedback**: No clear guidance for users on what needed to be configured
+
+**Solution**: Comprehensive UX improvements addressing each issue systematically:
+1. **Fixed SQLAlchemy Warning**: Updated `app/api/status.py` to use `text("SELECT 1")` instead of raw string for database health checks
+2. **Created Missing Templates**:
+   - Built comprehensive `app/templates/system_status.html` with real-time system monitoring, health checks, and configuration status
+   - Built `app/templates/google_auth.html` with OAuth setup wizard, token management, and calendar discovery
+3. **Enhanced Health Check Logic**:
+   - Added new status `"needs_setup"` when system is running but Google OAuth isn't configured
+   - Added `google_configured` and `google_auth_error` fields to `HealthCheckResponse` model
+   - Updated status determination to distinguish between critical failures and configuration needs
+4. **Fixed API Authentication**: Enhanced `is_localhost()` function in `app/auth/security.py` to treat private network addresses (Docker networks, internal IPs) as localhost-equivalent using `ip.is_private`
+5. **Improved Dashboard Feedback**:
+   - Updated dashboard JavaScript to handle new status types with appropriate colors and messaging
+   - Added automatic setup alerts when Google OAuth is not configured
+   - Enhanced status cards with clearer messaging and helpful guidance
+
+**Result**: Significantly improved user experience with clear status reporting, helpful setup guidance, and elimination of confusing error messages. System now correctly shows "Needs Setup" instead of "Unhealthy" when core services are running but configuration is incomplete.
+
+**Notes**: The key insight was that "unhealthy" should indicate actual system failures, not missing optional configuration. The new status hierarchy (healthy → needs_setup → degraded → unhealthy) provides much clearer feedback to users. The Docker network authentication fix eliminates false security warnings for legitimate internal requests. The new templates provide comprehensive system monitoring and setup guidance, transforming the user experience from confusing errors to helpful guidance.
+
+---
+
 ## Project Completion Status
 
 ### Final Implementation Summary

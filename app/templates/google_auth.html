@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+
+{% block title %}Google Authentication - CalDAV Sync Microservice{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-google"></i> Google Authentication</h1>
+            <button class="btn btn-primary" onclick="refreshAuthStatus()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Authentication Status -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-white" id="auth-status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Auth Status</h5>
+                        <h3 id="auth-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-shield-check fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card text-white" id="token-status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Token Status</h5>
+                        <h3 id="token-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-key fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Calendar Access</h5>
+                        <h3 id="calendar-access">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-calendar fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Setup Instructions -->
+<div class="row mb-4" id="setup-instructions" style="display: none;">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-exclamation-triangle"></i> Google OAuth Setup Required</h5>
+            </div>
+            <div class="card-body">
+                <p>To use Google Calendar integration, you need to configure Google OAuth credentials:</p>
+                <ol>
+                    <li>Go to the <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                    <li>Create a new project or select an existing one</li>
+                    <li>Enable the Google Calendar API</li>
+                    <li>Create OAuth 2.0 credentials (Web application)</li>
+                    <li>Add your redirect URI: <code id="redirect-uri">Loading...</code></li>
+                    <li>Set the <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> environment variables</li>
+                    <li>Restart the application</li>
+                </ol>
+                <div class="alert alert-info mt-3">
+                    <strong>Note:</strong> Make sure to add the correct redirect URI in your Google OAuth configuration.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Authentication Actions -->
+<div class="row mb-4" id="auth-actions">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-gear"></i> Authentication Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-success w-100" id="start-auth-btn" onclick="startAuthentication()" disabled>
+                            <i class="bi bi-play-circle"></i> Start Authentication
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-info w-100" id="test-connection-btn" onclick="testConnection()" disabled>
+                            <i class="bi bi-wifi"></i> Test Connection
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-warning w-100" id="refresh-token-btn" onclick="refreshToken()" disabled>
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Token
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-danger w-100" id="revoke-auth-btn" onclick="revokeAuthentication()" disabled>
+                            <i class="bi bi-x-circle"></i> Revoke Access
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Token Information -->
+<div class="row mb-4" id="token-info-section" style="display: none;">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Token Information</h5>
+            </div>
+            <div class="card-body">
+                <div id="token-details">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-list-check"></i> Granted Scopes</h5>
+            </div>
+            <div class="card-body">
+                <div id="scopes-list">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Google Calendars -->
+<div class="row" id="calendars-section" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-calendar-check"></i> Available Google Calendars</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadCalendars()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh Calendars
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="calendars-list">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadAuthStatus();
+    updateRedirectUri();
+});
+
+function updateRedirectUri() {
+    const redirectUri = `${window.location.origin}/oauth/callback`;
+    const redirectElement = document.getElementById('redirect-uri');
+    if (redirectElement) {
+        redirectElement.textContent = redirectUri;
+    }
+}
+
+async function loadAuthStatus() {
+    try {
+        // Load authentication status
+        const response = await fetch('/api/google/auth/status');
+        const data = await response.json();
+        updateAuthStatus(data);
+        
+        // Load configuration status
+        const configResponse = await fetch('/api/config');
+        const configData = await configResponse.json();
+        updateConfigStatus(configData);
+        
+    } catch (error) {
+        console.error('Error loading auth status:', error);
+        showAlert('Error loading authentication status: ' + error.message, 'error');
+        updateAuthStatus({ authenticated: false, has_credentials: false });
+    }
+}
+
+function updateAuthStatus(data) {
+    // Update auth status card
+    const authElement = document.getElementById('auth-status');
+    const authCard = document.getElementById('auth-status-card');
+    
+    const isAuthenticated = data.authenticated || false;
+    const hasCredentials = data.has_credentials || false;
+    
+    authElement.textContent = isAuthenticated ? 'Connected' : 'Not Connected';
+    authCard.className = authCard.className.replace(/bg-\w+/, 
+        isAuthenticated ? 'bg-success' : 'bg-danger'
+    );
+    
+    // Update token status card
+    const tokenElement = document.getElementById('token-status');
+    const tokenCard = document.getElementById('token-status-card');
+    
+    const tokenValid = data.token_valid || false;
+    const tokenExpired = data.token_expired || false;
+    
+    let tokenStatus = 'Unknown';
+    let tokenColor = 'bg-secondary';
+    
+    if (isAuthenticated) {
+        if (tokenExpired) {
+            tokenStatus = 'Expired';
+            tokenColor = 'bg-warning';
+        } else if (tokenValid) {
+            tokenStatus = 'Valid';
+            tokenColor = 'bg-success';
+        } else {
+            tokenStatus = 'Invalid';
+            tokenColor = 'bg-danger';
+        }
+    } else {
+        tokenStatus = 'None';
+        tokenColor = 'bg-secondary';
+    }
+    
+    tokenElement.textContent = tokenStatus;
+    tokenCard.className = tokenCard.className.replace(/bg-\w+/, tokenColor);
+    
+    // Update calendar access
+    const calendarElement = document.getElementById('calendar-access');
+    calendarElement.textContent = isAuthenticated && tokenValid ? 'Available' : 'Unavailable';
+    
+    // Show/hide sections based on status
+    const setupInstructions = document.getElementById('setup-instructions');
+    const tokenInfoSection = document.getElementById('token-info-section');
+    const calendarsSection = document.getElementById('calendars-section');
+    
+    if (!hasCredentials) {
+        setupInstructions.style.display = 'block';
+        tokenInfoSection.style.display = 'none';
+        calendarsSection.style.display = 'none';
+    } else {
+        setupInstructions.style.display = 'none';
+        tokenInfoSection.style.display = isAuthenticated ? 'block' : 'none';
+        calendarsSection.style.display = isAuthenticated && tokenValid ? 'block' : 'none';
+    }
+    
+    // Update button states
+    updateButtonStates(hasCredentials, isAuthenticated, tokenValid, tokenExpired);
+    
+    // Load additional details if authenticated
+    if (isAuthenticated) {
+        loadTokenDetails(data);
+        if (tokenValid) {
+            loadCalendars();
+        }
+    }
+}
+
+function updateConfigStatus(configData) {
+    // This would be called to check if Google OAuth is properly configured
+    // For now, we'll assume it's configured if we got this far
+}
+
+function updateButtonStates(hasCredentials, isAuthenticated, tokenValid, tokenExpired) {
+    const startAuthBtn = document.getElementById('start-auth-btn');
+    const testConnectionBtn = document.getElementById('test-connection-btn');
+    const refreshTokenBtn = document.getElementById('refresh-token-btn');
+    const revokeAuthBtn = document.getElementById('revoke-auth-btn');
+    
+    startAuthBtn.disabled = !hasCredentials || isAuthenticated;
+    testConnectionBtn.disabled = !isAuthenticated || !tokenValid;
+    refreshTokenBtn.disabled = !isAuthenticated || (!tokenExpired && tokenValid);
+    revokeAuthBtn.disabled = !isAuthenticated;
+}
+
+function loadTokenDetails(data) {
+    const tokenDetails = document.getElementById('token-details');
+    const scopesList = document.getElementById('scopes-list');
+    
+    // Token details
+    const expiresAt = data.expires_at ? new Date(data.expires_at).toLocaleString() : 'Unknown';
+    const tokenType = data.token_type || 'Bearer';
+    
+    tokenDetails.innerHTML = `
+        <div class="row">
+            <div class="col-6"><strong>Token Type:</strong></div>
+            <div class="col-6">${tokenType}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>Expires At:</strong></div>
+            <div class="col-6">${expiresAt}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>Has Refresh Token:</strong></div>
+            <div class="col-6">${data.has_refresh_token ? 'Yes' : 'No'}</div>
+        </div>
+    `;
+    
+    // Scopes
+    const scopes = data.scopes || [];
+    if (scopes.length > 0) {
+        const scopesHtml = scopes.map(scope => `
+            <div class="badge bg-primary me-1 mb-1">${scope}</div>
+        `).join('');
+        scopesList.innerHTML = scopesHtml;
+    } else {
+        scopesList.innerHTML = '<p class="text-muted">No scopes information available</p>';
+    }
+}
+
+async function loadCalendars() {
+    const calendarsList = document.getElementById('calendars-list');
+    calendarsList.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading calendars...</span>
+            </div>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/google/calendars');
+        const calendars = await response.json();
+        
+        if (calendars.length === 0) {
+            calendarsList.innerHTML = '<p class="text-muted text-center">No calendars found</p>';
+            return;
+        }
+        
+        const calendarsHtml = calendars.map(calendar => {
+            const accessRole = calendar.accessRole || 'unknown';
+            const primary = calendar.primary ? ' (Primary)' : '';
+            const badgeClass = accessRole === 'owner' ? 'success' : 
+                              accessRole === 'writer' ? 'warning' : 'secondary';
+            
+            return `
+                <div class="row align-items-center border-bottom py-2">
+                    <div class="col-md-6">
+                        <strong>${calendar.summary}${primary}</strong>
+                        <br>
+                        <small class="text-muted">${calendar.id}</small>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="badge bg-${badgeClass}">${accessRole}</span>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="createMapping('${calendar.id}', '${calendar.summary}')">
+                            <i class="bi bi-plus-circle"></i> Create Mapping
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        calendarsList.innerHTML = calendarsHtml;
+        
+    } catch (error) {
+        console.error('Error loading calendars:', error);
+        calendarsList.innerHTML = '<div class="alert alert-danger">Error loading calendars</div>';
+    }
+}
+
+async function startAuthentication() {
+    try {
+        const response = await fetch('/api/google/auth/url');
+        const data = await response.json();
+        
+        if (data.auth_url) {
+            window.location.href = data.auth_url;
+        } else {
+            showAlert('Failed to get authentication URL', 'error');
+        }
+    } catch (error) {
+        console.error('Error starting authentication:', error);
+        showAlert('Error starting authentication: ' + error.message, 'error');
+    }
+}
+
+async function testConnection() {
+    try {
+        showAlert('Testing connection...', 'info');
+        
+        const response = await fetch('/api/google/test');
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('Connection test successful!', 'success');
+        } else {
+            showAlert('Connection test failed: ' + (data.detail || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error testing connection:', error);
+        showAlert('Error testing connection: ' + error.message, 'error');
+    }
+}
+
+async function refreshToken() {
+    try {
+        showAlert('Refreshing token...', 'info');
+        
+        const response = await fetch('/api/google/auth/refresh', { method: 'POST' });
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('Token refreshed successfully!', 'success');
+            loadAuthStatus();
+        } else {
+            showAlert('Token refresh failed: ' + (data.detail || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error refreshing token:', error);
+        showAlert('Error refreshing token: ' + error.message, 'error');
+    }
+}
+
+async function revokeAuthentication() {
+    if (!confirm('Are you sure you want to revoke Google authentication? This will disable all Google Calendar sync functionality.')) {
+        return;
+    }
+    
+    try {
+        showAlert('Revoking authentication...', 'info');
+        
+        const response = await fetch('/api/google/auth/revoke', { method: 'POST' });
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('Authentication revoked successfully!', 'success');
+            loadAuthStatus();
+        } else {
+            showAlert('Failed to revoke authentication: ' + (data.detail || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error revoking authentication:', error);
+        showAlert('Error revoking authentication: ' + error.message, 'error');
+    }
+}
+
+function createMapping(calendarId, calendarName) {
+    // Redirect to mappings page with pre-filled Google calendar info
+    const params = new URLSearchParams({
+        google_calendar_id: calendarId,
+        google_calendar_name: calendarName
+    });
+    window.location.href = `/mappings?${params.toString()}`;
+}
+
+function refreshAuthStatus() {
+    loadAuthStatus();
+    showAlert('Authentication status refreshed', 'info');
+}
+
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

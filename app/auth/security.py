@@ -19,13 +19,13 @@ security = HTTPBearer(auto_error=False)
 
 def is_localhost(host: str) -> bool:
     """
-    Check if the given host is localhost.
+    Check if the given host is localhost or internal network.
     
     Args:
         host: Host address to check
         
     Returns:
-        True if host is localhost, False otherwise
+        True if host is localhost or internal network, False otherwise
     """
     try:
         # Handle IPv6 localhost
@@ -34,7 +34,15 @@ def is_localhost(host: str) -> bool:
         
         # Check if it's a loopback address
         ip = ipaddress.ip_address(host)
-        return ip.is_loopback
+        if ip.is_loopback:
+            return True
+        
+        # Check if it's a private/internal network address
+        # This includes Docker networks (172.x.x.x), private networks (192.168.x.x, 10.x.x.x)
+        if ip.is_private:
+            return True
+            
+        return False
     
     except ValueError:
         # Not a valid IP address, check if it's localhost hostname

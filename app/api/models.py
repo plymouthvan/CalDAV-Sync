@@ -228,6 +228,8 @@ class HealthCheckResponse(BaseModel):
     version: str = "1.0.0"
     database_connected: bool
     google_authenticated: bool
+    google_configured: bool
+    google_auth_error: Optional[str] = None
     scheduler_running: bool
     active_mappings: int
     last_sync_times: Dict[str, Optional[datetime]]

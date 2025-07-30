@@ -1,0 +1,462 @@
+{% extends "base.html" %}
+
+{% block title %}System Status - CalDAV Sync Microservice{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-activity"></i> System Status</h1>
+            <button class="btn btn-primary" onclick="refreshStatus()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- System Health Overview -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white" id="overall-status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Overall Status</h5>
+                        <h3 id="overall-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-heart-pulse fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white" id="database-status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Database</h5>
+                        <h3 id="database-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-database fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white" id="scheduler-status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Scheduler</h5>
+                        <h3 id="scheduler-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-clock fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white" id="google-status-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Google Auth</h5>
+                        <h3 id="google-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-google fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Status Information -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> System Information</h5>
+            </div>
+            <div class="card-body">
+                <div id="system-info">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-gear"></i> Configuration Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="config-status">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scheduler Details -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calendar-event"></i> Scheduler Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div id="scheduler-stats">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-graph-up"></i> System Metrics</h5>
+            </div>
+            <div class="card-body">
+                <div id="system-metrics">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Health Check Details -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-list-check"></i> Detailed Health Checks</h5>
+            </div>
+            <div class="card-body">
+                <div id="health-details">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadSystemStatus();
+    
+    // Auto-refresh every 10 seconds
+    setInterval(loadSystemStatus, 10000);
+});
+
+async function loadSystemStatus() {
+    try {
+        // Load basic health check
+        const healthResponse = await fetch('/api/status');
+        const healthData = await healthResponse.json();
+        updateHealthStatus(healthData);
+        
+        // Load detailed system status
+        const detailedResponse = await fetch('/api/status/detailed');
+        const detailedData = await detailedResponse.json();
+        updateDetailedStatus(detailedData);
+        
+        // Load version info
+        const versionResponse = await fetch('/api/version');
+        const versionData = await versionResponse.json();
+        updateSystemInfo(versionData);
+        
+        // Load configuration info
+        const configResponse = await fetch('/api/config');
+        const configData = await configResponse.json();
+        updateConfigStatus(configData);
+        
+        // Load system metrics
+        const metricsResponse = await fetch('/api/metrics');
+        const metricsData = await metricsResponse.json();
+        updateSystemMetrics(metricsData);
+        
+    } catch (error) {
+        console.error('Error loading system status:', error);
+        showAlert('Error loading system status: ' + error.message, 'error');
+    }
+}
+
+function updateHealthStatus(data) {
+    // Update overall status
+    const overallElement = document.getElementById('overall-status');
+    const overallCard = document.getElementById('overall-status-card');
+    
+    overallElement.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+    overallCard.className = overallCard.className.replace(/bg-\w+/, 
+        data.status === 'healthy' ? 'bg-success' : 
+        data.status === 'degraded' ? 'bg-warning' : 'bg-danger'
+    );
+    
+    // Update database status
+    const dbElement = document.getElementById('database-status');
+    const dbCard = document.getElementById('database-status-card');
+    
+    dbElement.textContent = data.database_connected ? 'Connected' : 'Disconnected';
+    dbCard.className = dbCard.className.replace(/bg-\w+/, 
+        data.database_connected ? 'bg-success' : 'bg-danger'
+    );
+    
+    // Update scheduler status
+    const schedulerElement = document.getElementById('scheduler-status');
+    const schedulerCard = document.getElementById('scheduler-status-card');
+    
+    schedulerElement.textContent = data.scheduler_running ? 'Running' : 'Stopped';
+    schedulerCard.className = schedulerCard.className.replace(/bg-\w+/, 
+        data.scheduler_running ? 'bg-success' : 'bg-danger'
+    );
+    
+    // Update Google auth status
+    const googleElement = document.getElementById('google-status');
+    const googleCard = document.getElementById('google-status-card');
+    
+    googleElement.textContent = data.google_authenticated ? 'Connected' : 'Not Connected';
+    googleCard.className = googleCard.className.replace(/bg-\w+/, 
+        data.google_authenticated ? 'bg-success' : 'bg-secondary'
+    );
+    
+    // Update health details
+    updateHealthDetails(data);
+}
+
+function updateHealthDetails(data) {
+    const detailsContainer = document.getElementById('health-details');
+    
+    const checks = [
+        { name: 'Database Connection', status: data.database_connected, icon: 'database' },
+        { name: 'Scheduler Running', status: data.scheduler_running, icon: 'clock' },
+        { name: 'Google Authentication', status: data.google_authenticated, icon: 'google' },
+        { name: 'Active Mappings', status: data.active_mappings > 0, icon: 'arrow-left-right', value: data.active_mappings }
+    ];
+    
+    const checksHtml = checks.map(check => {
+        const statusClass = check.status ? 'success' : 'danger';
+        const statusIcon = check.status ? 'check-circle' : 'x-circle';
+        const statusText = check.status ? 'OK' : 'FAIL';
+        const valueText = check.value !== undefined ? ` (${check.value})` : '';
+        
+        return `
+            <div class="row align-items-center border-bottom py-2">
+                <div class="col-md-6">
+                    <i class="bi bi-${check.icon}"></i> ${check.name}${valueText}
+                </div>
+                <div class="col-md-6 text-end">
+                    <span class="badge bg-${statusClass}">
+                        <i class="bi bi-${statusIcon}"></i> ${statusText}
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    detailsContainer.innerHTML = checksHtml;
+}
+
+function updateDetailedStatus(data) {
+    // Update scheduler stats
+    const schedulerContainer = document.getElementById('scheduler-stats');
+    const schedulerStats = data.scheduler_stats;
+    
+    if (schedulerStats.error) {
+        schedulerContainer.innerHTML = `<div class="alert alert-warning">Error: ${schedulerStats.error}</div>`;
+    } else {
+        schedulerContainer.innerHTML = `
+            <div class="row text-center">
+                <div class="col-6">
+                    <h4>${schedulerStats.total_jobs || 0}</h4>
+                    <small class="text-muted">Total Jobs</small>
+                </div>
+                <div class="col-6">
+                    <h4>${schedulerStats.active_syncs || 0}</h4>
+                    <small class="text-muted">Active Syncs</small>
+                </div>
+            </div>
+            <hr>
+            <div class="text-center">
+                <small class="text-muted">
+                    Running: ${schedulerStats.running ? 'Yes' : 'No'}<br>
+                    Next Job: ${schedulerStats.next_job_run || 'None scheduled'}
+                </small>
+            </div>
+        `;
+    }
+}
+
+function updateSystemInfo(data) {
+    const infoContainer = document.getElementById('system-info');
+    
+    infoContainer.innerHTML = `
+        <div class="row">
+            <div class="col-6"><strong>Version:</strong></div>
+            <div class="col-6">${data.version}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>Environment:</strong></div>
+            <div class="col-6">${data.environment}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>Debug Mode:</strong></div>
+            <div class="col-6">${data.debug_mode ? 'Enabled' : 'Disabled'}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>API Docs:</strong></div>
+            <div class="col-6">${data.api_docs_enabled ? 'Enabled' : 'Disabled'}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>Python:</strong></div>
+            <div class="col-6">${data.python_version}</div>
+        </div>
+        <div class="row">
+            <div class="col-6"><strong>Build Date:</strong></div>
+            <div class="col-6">${data.build_date}</div>
+        </div>
+    `;
+}
+
+function updateConfigStatus(data) {
+    const configContainer = document.getElementById('config-status');
+    
+    const hasGoogleConfig = data.google_calendar && data.google_calendar.batch_size;
+    const hasCalDAVConfig = data.caldav && data.caldav.connection_timeout;
+    const hasSyncConfig = data.sync && data.sync.default_interval_minutes;
+    
+    configContainer.innerHTML = `
+        <div class="row align-items-center py-1">
+            <div class="col-8">Database Configuration</div>
+            <div class="col-4 text-end">
+                <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
+            </div>
+        </div>
+        <div class="row align-items-center py-1">
+            <div class="col-8">Google Calendar Config</div>
+            <div class="col-4 text-end">
+                <span class="badge bg-${hasGoogleConfig ? 'success' : 'warning'}">
+                    <i class="bi bi-${hasGoogleConfig ? 'check-circle' : 'exclamation-triangle'}"></i> 
+                    ${hasGoogleConfig ? 'OK' : 'PARTIAL'}
+                </span>
+            </div>
+        </div>
+        <div class="row align-items-center py-1">
+            <div class="col-8">CalDAV Configuration</div>
+            <div class="col-4 text-end">
+                <span class="badge bg-${hasCalDAVConfig ? 'success' : 'warning'}">
+                    <i class="bi bi-${hasCalDAVConfig ? 'check-circle' : 'exclamation-triangle'}"></i> 
+                    ${hasCalDAVConfig ? 'OK' : 'PARTIAL'}
+                </span>
+            </div>
+        </div>
+        <div class="row align-items-center py-1">
+            <div class="col-8">Sync Configuration</div>
+            <div class="col-4 text-end">
+                <span class="badge bg-${hasSyncConfig ? 'success' : 'warning'}">
+                    <i class="bi bi-${hasSyncConfig ? 'check-circle' : 'exclamation-triangle'}"></i> 
+                    ${hasSyncConfig ? 'OK' : 'PARTIAL'}
+                </span>
+            </div>
+        </div>
+    `;
+}
+
+function updateSystemMetrics(data) {
+    const metricsContainer = document.getElementById('system-metrics');
+    
+    const dbMetrics = data.database || {};
+    const schedulerMetrics = data.scheduler || {};
+    const syncMetrics = data.sync || {};
+    
+    metricsContainer.innerHTML = `
+        <div class="row text-center mb-3">
+            <div class="col-4">
+                <h5>${dbMetrics.total_mappings || 0}</h5>
+                <small class="text-muted">Total Mappings</small>
+            </div>
+            <div class="col-4">
+                <h5>${dbMetrics.enabled_mappings || 0}</h5>
+                <small class="text-muted">Enabled</small>
+            </div>
+            <div class="col-4">
+                <h5>${dbMetrics.total_sync_logs || 0}</h5>
+                <small class="text-muted">Sync Logs</small>
+            </div>
+        </div>
+        <hr>
+        <div class="row text-center">
+            <div class="col-6">
+                <h6 class="text-success">${syncMetrics.successful_syncs_last_hour || 0}</h6>
+                <small class="text-muted">Successful (1h)</small>
+            </div>
+            <div class="col-6">
+                <h6 class="text-danger">${syncMetrics.failed_syncs_last_hour || 0}</h6>
+                <small class="text-muted">Failed (1h)</small>
+            </div>
+        </div>
+    `;
+}
+
+function refreshStatus() {
+    loadSystemStatus();
+    showAlert('System status refreshed', 'info');
+}
+
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

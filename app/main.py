@@ -53,12 +53,22 @@ async def lifespan(app: FastAPI):
         
         # Test encryption key format
         logger.info("Testing encryption key...")
+        logger.info(f"ENCRYPTION_KEY value: '{settings.security.encryption_key}'")
+        logger.info(f"ENCRYPTION_KEY length: {len(settings.security.encryption_key) if settings.security.encryption_key else 'None'}")
+        logger.info(f"ENCRYPTION_KEY type: {type(settings.security.encryption_key)}")
+        
         try:
             from cryptography.fernet import Fernet
-            test_fernet = Fernet(settings.security.encryption_key.encode())
+            encoded_key = settings.security.encryption_key.encode()
+            logger.info(f"Encoded key length: {len(encoded_key)} bytes")
+            logger.info(f"Encoded key (first 20 chars): {encoded_key[:20]}...")
+            
+            test_fernet = Fernet(encoded_key)
             logger.info("Encryption key format is valid")
         except Exception as e:
             logger.error(f"Invalid encryption key format: {e}")
+            logger.error(f"Fernet requires a 32-byte URL-safe base64-encoded key")
+            logger.error(f"Current key appears to be plain text, not base64-encoded")
             raise ValueError(f"Invalid ENCRYPTION_KEY format: {e}")
         
         # Initialize database
