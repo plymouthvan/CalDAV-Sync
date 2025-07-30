@@ -67,6 +67,7 @@ class GoogleOAuthManager:
             authorization_url, _ = flow.authorization_url(
                 access_type='offline',
                 include_granted_scopes='true',
+                prompt='consent',
                 state=state
             )
             
@@ -174,14 +175,17 @@ class GoogleOAuthManager:
                 self.logger.info(f"Token URI: https://oauth2.googleapis.com/token")
                 self.logger.info(f"Scopes: {json.loads(db_token.scopes) if db_token.scopes else self.settings.google.scopes}")
                 
-                # Create credentials object
+                # Create credentials object with explicit expiry
+                expiry = db_token.expires_at if db_token.expires_at else None
+                
                 credentials = Credentials(
                     token=access_token,
                     refresh_token=refresh_token,
                     token_uri="https://oauth2.googleapis.com/token",
                     client_id=self.settings.google.client_id,
                     client_secret=self.settings.google.client_secret,
-                    scopes=json.loads(db_token.scopes) if db_token.scopes else self.settings.google.scopes
+                    scopes=json.loads(db_token.scopes) if db_token.scopes else self.settings.google.scopes,
+                    expiry=expiry
                 )
                 
                 # Debug logging for constructed credentials
@@ -191,7 +195,32 @@ class GoogleOAuthManager:
                 self.logger.info(f"Credentials client_id: {bool(credentials.client_id)}")
                 self.logger.info(f"Credentials client_secret: {bool(credentials.client_secret)}")
                 self.logger.info(f"Credentials token_uri: {credentials.token_uri}")
+                self.logger.info(f"Credentials expiry: {credentials.expiry}")
                 self.logger.info(f"Credentials expired: {credentials.expired}")
+                
+                # Force refresh token to be set if it's missing but we have one in storage
+                if not credentials.refresh_token and refresh_token:
+                    self.logger.warning("Credentials object missing refresh_token, manually setting it")
+                    credentials._refresh_token = refresh_token
+                
+                # Validate all required fields are present
+                missing_fields = []
+                if not credentials.token:
+                    missing_fields.append("token")
+                if not credentials.refresh_token:
+                    missing_fields.append("refresh_token")
+                if not credentials.client_id:
+                    missing_fields.append("client_id")
+                if not credentials.client_secret:
+                    missing_fields.append("client_secret")
+                if not credentials.token_uri:
+                    missing_fields.append("token_uri")
+                
+                if missing_fields:
+                    self.logger.error(f"Credentials missing required fields: {missing_fields}")
+                    return None
+                
+                self.logger.info("All required credential fields are present")
                 
                 # Check if token needs refresh
                 if credentials.expired and credentials.refresh_token:
