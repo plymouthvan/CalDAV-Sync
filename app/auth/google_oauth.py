@@ -156,6 +156,7 @@ class GoogleOAuthManager:
                 db_token = db.query(GoogleOAuthToken).first()
                 
                 if not db_token:
+                    self.logger.debug("No OAuth token found in database")
                     return None
                 
                 encryption_key = self.settings.security.encryption_key
@@ -163,6 +164,15 @@ class GoogleOAuthManager:
                 # Decrypt tokens
                 access_token = db_token.get_access_token(encryption_key)
                 refresh_token = db_token.get_refresh_token(encryption_key)
+                
+                # Debug logging for credential fields
+                self.logger.info(f"=== CREDENTIAL CONSTRUCTION DEBUG ===")
+                self.logger.info(f"Access token present: {bool(access_token)}")
+                self.logger.info(f"Refresh token present: {bool(refresh_token)}")
+                self.logger.info(f"Client ID present: {bool(self.settings.google.client_id)}")
+                self.logger.info(f"Client secret present: {bool(self.settings.google.client_secret)}")
+                self.logger.info(f"Token URI: https://oauth2.googleapis.com/token")
+                self.logger.info(f"Scopes: {json.loads(db_token.scopes) if db_token.scopes else self.settings.google.scopes}")
                 
                 # Create credentials object
                 credentials = Credentials(
@@ -173,6 +183,15 @@ class GoogleOAuthManager:
                     client_secret=self.settings.google.client_secret,
                     scopes=json.loads(db_token.scopes) if db_token.scopes else self.settings.google.scopes
                 )
+                
+                # Debug logging for constructed credentials
+                self.logger.info(f"=== CONSTRUCTED CREDENTIALS DEBUG ===")
+                self.logger.info(f"Credentials token: {bool(credentials.token)}")
+                self.logger.info(f"Credentials refresh_token: {bool(credentials.refresh_token)}")
+                self.logger.info(f"Credentials client_id: {bool(credentials.client_id)}")
+                self.logger.info(f"Credentials client_secret: {bool(credentials.client_secret)}")
+                self.logger.info(f"Credentials token_uri: {credentials.token_uri}")
+                self.logger.info(f"Credentials expired: {credentials.expired}")
                 
                 # Check if token needs refresh
                 if credentials.expired and credentials.refresh_token:
