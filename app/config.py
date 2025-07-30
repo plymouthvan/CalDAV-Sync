@@ -26,7 +26,7 @@ class ServerConfig(BaseSettings):
     port: int = Field(default=8000)
     debug: bool = Field(default=False)
     reload: bool = Field(default=False)
-    base_url: str = Field(default="http://localhost:8000")
+    base_url: str = Field(default="http://localhost:8000", env="BASE_URL")
     
     model_config = {
         "env_file": ".env",

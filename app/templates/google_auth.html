@@ -200,6 +200,18 @@ function updateRedirectUri() {
     if (redirectElement) {
         redirectElement.textContent = redirectUri;
     }
+    
+    // Also update the setup instructions to show the correct URI
+    const setupSection = document.getElementById('setup-instructions');
+    if (setupSection) {
+        const instructionText = setupSection.querySelector('.alert-info');
+        if (instructionText) {
+            instructionText.innerHTML = `
+                <strong>Note:</strong> Make sure to add this exact redirect URI in your Google OAuth configuration:
+                <code>${redirectUri}</code>
+            `;
+        }
+    }
 }
 
 async function loadAuthStatus() {
