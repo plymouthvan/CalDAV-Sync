@@ -75,6 +75,14 @@ class GoogleCalendarClient:
                     raise handle_google_exception(e)
             
             except Exception as e:
+                error_str = str(e).lower()
+                # Check if this is an invalid_grant error (refresh token revoked)
+                if 'invalid_grant' in error_str or 'token has been expired or revoked' in error_str:
+                    self.logger.error(f"Refresh token invalid or revoked: {e}")
+                    # Clear the service to force re-authentication
+                    self._service = None
+                    raise handle_google_exception(e)
+                
                 if attempt < max_retries - 1:
                     self.logger.warning(f"Request failed, retrying (attempt {attempt + 1}): {e}")
                     time.sleep(2 ** attempt)  # Exponential backoff

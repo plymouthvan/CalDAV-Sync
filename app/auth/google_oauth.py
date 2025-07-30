@@ -225,6 +225,7 @@ class GoogleOAuthManager:
                 # Check if token needs refresh
                 if credentials.expired and credentials.refresh_token:
                     try:
+                        self.logger.info("Access token expired, attempting refresh...")
                         credentials.refresh(Request())
                         
                         # Update database with new tokens
@@ -240,8 +241,16 @@ class GoogleOAuthManager:
                         self.logger.info("OAuth token refreshed successfully")
                         
                     except Exception as e:
-                        self.logger.error("OAuth token refresh failed")
-                        self.logger.error(f"Token refresh failed: {e}")
+                        self.logger.error(f"OAuth token refresh failed: {e}")
+                        
+                        # Check if this is an invalid_grant error (refresh token revoked)
+                        error_str = str(e).lower()
+                        if 'invalid_grant' in error_str or 'token has been expired or revoked' in error_str:
+                            self.logger.warning("Refresh token has been revoked, clearing stored tokens")
+                            # Clear the invalid tokens from database
+                            db.query(GoogleOAuthToken).delete()
+                            db.commit()
+                        
                         return None
                 
                 return credentials
