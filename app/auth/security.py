@@ -185,13 +185,16 @@ def get_request_info(request: Request) -> dict:
     }
 
 
-class SecurityMiddleware:
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityMiddleware(BaseHTTPMiddleware):
     """Middleware for security logging and rate limiting."""
     
-    def __init__(self):
+    def __init__(self, app):
+        super().__init__(app)
         self.settings = get_settings()
     
-    async def __call__(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):
         """Process request with security checks."""
         request_info = get_request_info(request)
         
@@ -210,8 +213,12 @@ class SecurityMiddleware:
         # Add CORS headers if enabled
         if self.settings.api.enable_cors:
             origin = request.headers.get("Origin")
-            if origin in self.settings.api.cors_origins or "*" in self.settings.api.cors_origins:
+            if origin and (origin in self.settings.api.cors_origins or "*" in self.settings.api.cors_origins):
                 response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            elif "*" in self.settings.api.cors_origins:
+                response.headers["Access-Control-Allow-Origin"] = "*"
                 response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
                 response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         
