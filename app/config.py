@@ -193,12 +193,6 @@ class Settings:
         """Validate that all required settings are present."""
         errors = []
         
-        # Debug logging
-        print(f"DEBUG: google.client_id = '{self.google.client_id}' (type: {type(self.google.client_id)})")
-        print(f"DEBUG: google.client_secret = '{self.google.client_secret}' (type: {type(self.google.client_secret)})")
-        print(f"DEBUG: security.secret_key = '{self.security.secret_key}' (type: {type(self.security.secret_key)})")
-        print(f"DEBUG: security.encryption_key = '{self.security.encryption_key}' (type: {type(self.security.encryption_key)})")
-        
         if not self.google.client_id:
             errors.append("GOOGLE_CLIENT_ID is required")
         
