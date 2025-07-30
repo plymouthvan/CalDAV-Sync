@@ -218,7 +218,18 @@ class DatabaseManager:
     
     def create_tables(self):
         """Create all database tables."""
-        Base.metadata.create_all(bind=self.engine)
+        try:
+            from app.utils.logging import get_logger
+            logger = get_logger("database")
+            logger.info(f"Creating database tables with URL: {self.database_url}")
+            Base.metadata.create_all(bind=self.engine)
+            logger.info("Database tables created successfully")
+        except Exception as e:
+            from app.utils.logging import get_logger
+            logger = get_logger("database")
+            logger.error(f"Failed to create database tables: {type(e).__name__}: {e}")
+            logger.error(f"Database URL: {self.database_url}")
+            raise
     
     def get_session(self) -> Session:
         """Get a database session."""

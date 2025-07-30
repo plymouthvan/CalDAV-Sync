@@ -63,12 +63,20 @@ class SyncScheduler:
     
     async def start(self):
         """Start the scheduler."""
-        if not self.scheduler.running:
-            self.scheduler.start()
-            logger.info("Sync scheduler started")
-            
-            # Schedule all enabled mappings
-            await self.schedule_all_mappings()
+        try:
+            if not self.scheduler.running:
+                logger.info("Starting APScheduler...")
+                self.scheduler.start()
+                logger.info("APScheduler started successfully")
+                
+                # Schedule all enabled mappings
+                logger.info("Scheduling enabled calendar mappings...")
+                await self.schedule_all_mappings()
+                logger.info("Sync scheduler startup complete")
+        except Exception as e:
+            logger.error(f"Failed to start sync scheduler: {type(e).__name__}: {e}")
+            logger.error(f"Scheduler configuration: jobstore={type(self.scheduler._jobstores['default']).__name__}")
+            raise
     
     async def stop(self):
         """Stop the scheduler."""
