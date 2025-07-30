@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - CalDAV Sync Microservice{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-house"></i> Dashboard</h1>
+            <button class="btn btn-primary" onclick="refreshDashboard()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- System Status Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">System Status</h5>
+                        <h3 id="system-status">Loading...</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Active Mappings</h5>
+                        <h3 id="active-mappings">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-arrow-left-right fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Running Syncs</h5>
+                        <h3 id="running-syncs">0</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-arrow-repeat fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white bg-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">Google Auth</h5>
+                        <h3 id="google-auth-status">Unknown</h3>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-google fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-lightning"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <button class="btn btn-outline-primary w-100" onclick="triggerManualSync()">
+                            <i class="bi bi-arrow-repeat"></i> Trigger Sync
+                        </button>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('caldav_accounts') }}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-plus-circle"></i> Add CalDAV Account
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('calendar_mappings') }}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-plus-circle"></i> Create Mapping
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('google_auth') }}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-google"></i> Setup Google Auth
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-clock-history"></i> Recent Sync Activity</h5>
+                <a href="{{ url_for('sync_history') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                <div id="recent-activity">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-bar-chart"></i> Sync Statistics (24h)</h5>
+            </div>
+            <div class="card-body">
+                <div id="sync-stats">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Calendar Mappings Overview -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-list"></i> Calendar Mappings</h5>
+                <a href="{{ url_for('calendar_mappings') }}" class="btn btn-sm btn-outline-primary">Manage All</a>
+            </div>
+            <div class="card-body">
+                <div id="mappings-overview">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Dashboard JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadDashboardData, 30000);
+});
+
+async function loadDashboardData() {
+    try {
+        // Load system status
+        const statusResponse = await fetch('/api/status');
+        const statusData = await statusResponse.json();
+        updateSystemStatus(statusData);
+        
+        // Load sync statistics
+        const statsResponse = await fetch('/api/sync/stats?days=1');
+        const statsData = await statsResponse.json();
+        updateSyncStats(statsData);
+        
+        // Load recent activity
+        const activityResponse = await fetch('/api/sync/history?limit=5');
+        const activityData = await activityResponse.json();
+        updateRecentActivity(activityData.results);
+        
+        // Load mappings overview
+        const mappingsResponse = await fetch('/api/mappings');
+        const mappingsData = await mappingsResponse.json();
+        updateMappingsOverview(mappingsData);
+        
+        // Load scheduler status
+        const schedulerResponse = await fetch('/api/sync/scheduler');
+        const schedulerData = await schedulerResponse.json();
+        updateSchedulerStatus(schedulerData);
+        
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showAlert('Error loading dashboard data', 'error');
+    }
+}
+
+function updateSystemStatus(data) {
+    const statusElement = document.getElementById('system-status');
+    const statusCard = statusElement.closest('.card');
+    
+    statusElement.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+    
+    // Update card color based on status
+    statusCard.className = statusCard.className.replace(/bg-\w+/, 
+        data.status === 'healthy' ? 'bg-success' : 
+        data.status === 'degraded' ? 'bg-warning' : 'bg-danger'
+    );
+    
+    document.getElementById('active-mappings').textContent = data.active_mappings;
+    document.getElementById('google-auth-status').textContent = data.google_authenticated ? 'Connected' : 'Not Connected';
+    
+    const googleCard = document.getElementById('google-auth-status').closest('.card');
+    googleCard.className = googleCard.className.replace(/bg-\w+/, 
+        data.google_authenticated ? 'bg-success' : 'bg-secondary'
+    );
+}
+
+function updateSchedulerStatus(data) {
+    const runningElement = document.getElementById('running-syncs');
+    runningElement.textContent = data.scheduler.active_syncs || 0;
+}
+
+function updateSyncStats(data) {
+    const statsContainer = document.getElementById('sync-stats');
+    
+    statsContainer.innerHTML = `
+        <div class="row text-center">
+            <div class="col-6">
+                <h4 class="text-success">${data.overview.successful_syncs}</h4>
+                <small class="text-muted">Successful</small>
+            </div>
+            <div class="col-6">
+                <h4 class="text-danger">${data.overview.failed_syncs}</h4>
+                <small class="text-muted">Failed</small>
+            </div>
+        </div>
+        <hr>
+        <div class="row text-center">
+            <div class="col-4">
+                <h5 class="text-primary">${data.events.total_inserted}</h5>
+                <small class="text-muted">Inserted</small>
+            </div>
+            <div class="col-4">
+                <h5 class="text-warning">${data.events.total_updated}</h5>
+                <small class="text-muted">Updated</small>
+            </div>
+            <div class="col-4">
+                <h5 class="text-info">${data.events.total_deleted}</h5>
+                <small class="text-muted">Deleted</small>
+            </div>
+        </div>
+        <hr>
+        <div class="text-center">
+            <small class="text-muted">
+                Success Rate: ${data.overview.success_rate.toFixed(1)}%<br>
+                Avg Duration: ${data.overview.average_duration_seconds.toFixed(1)}s
+            </small>
+        </div>
+    `;
+}
+
+function updateRecentActivity(activities) {
+    const activityContainer = document.getElementById('recent-activity');
+    
+    if (activities.length === 0) {
+        activityContainer.innerHTML = '<p class="text-muted text-center">No recent sync activity</p>';
+        return;
+    }
+    
+    const activityHtml = activities.map(activity => {
+        const statusBadge = activity.status === 'success' ? 'success' : 
+                           activity.status === 'failure' ? 'danger' : 'warning';
+        const statusIcon = activity.status === 'success' ? 'check-circle' : 
+                          activity.status === 'failure' ? 'x-circle' : 'exclamation-triangle';
+        
+        return `
+            <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                <div>
+                    <span class="badge bg-${statusBadge}">
+                        <i class="bi bi-${statusIcon}"></i> ${activity.status}
+                    </span>
+                    <small class="text-muted ms-2">${activity.direction}</small>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted">
+                        ${new Date(activity.started_at).toLocaleString()}
+                    </small>
+                    <br>
+                    <small class="text-success">${activity.inserted_count}I</small>
+                    <small class="text-warning">${activity.updated_count}U</small>
+                    <small class="text-info">${activity.deleted_count}D</small>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    activityContainer.innerHTML = activityHtml;
+}
+
+function updateMappingsOverview(mappings) {
+    const mappingsContainer = document.getElementById('mappings-overview');
+    
+    if (mappings.length === 0) {
+        mappingsContainer.innerHTML = `
+            <div class="text-center">
+                <p class="text-muted">No calendar mappings configured</p>
+                <a href="${window.location.origin}/mappings" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create First Mapping
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    const mappingsHtml = mappings.slice(0, 5).map(mapping => {
+        const statusBadge = mapping.enabled ? 'success' : 'secondary';
+        const statusText = mapping.enabled ? 'Enabled' : 'Disabled';
+        const lastSync = mapping.last_sync_at ? 
+            new Date(mapping.last_sync_at).toLocaleString() : 'Never';
+        
+        return `
+            <div class="row align-items-center border-bottom py-2">
+                <div class="col-md-4">
+                    <strong>${mapping.caldav_calendar_name}</strong>
+                    <br>
+                    <small class="text-muted">→ ${mapping.google_calendar_name}</small>
+                </div>
+                <div class="col-md-3">
+                    <span class="badge bg-${statusBadge}">${statusText}</span>
+                    <br>
+                    <small class="text-muted">${mapping.sync_direction}</small>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted">
+                        Last sync: ${lastSync}
+                    </small>
+                </div>
+                <div class="col-md-2 text-end">
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="toggleMapping('${mapping.id}', ${mapping.enabled})">
+                        <i class="bi bi-${mapping.enabled ? 'pause' : 'play'}"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    mappingsContainer.innerHTML = mappingsHtml;
+}
+
+async function triggerManualSync() {
+    try {
+        const response = await fetch('/api/sync/trigger', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert(`Triggered sync for ${data.triggered_count} mappings`, 'success');
+            setTimeout(loadDashboardData, 2000); // Refresh after 2 seconds
+        } else {
+            showAlert(data.detail || 'Failed to trigger sync', 'error');
+        }
+    } catch (error) {
+        console.error('Error triggering sync:', error);
+        showAlert('Error triggering sync', 'error');
+    }
+}
+
+async function toggleMapping(mappingId, currentlyEnabled) {
+    const action = currentlyEnabled ? 'disable' : 'enable';
+    
+    try {
+        const response = await fetch(`/api/mappings/${mappingId}/${action}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showAlert(`Mapping ${action}d successfully`, 'success');
+            loadDashboardData();
+        } else {
+            const data = await response.json();
+            showAlert(data.detail || `Failed to ${action} mapping`, 'error');
+        }
+    } catch (error) {
+        console.error(`Error ${action}ing mapping:`, error);
+        showAlert(`Error ${action}ing mapping`, 'error');
+    }
+}
+
+function refreshDashboard() {
+    loadDashboardData();
+    showAlert('Dashboard refreshed', 'info');
+}
+
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

@@ -28,6 +28,9 @@ from app.utils.exceptions import (
 from app.api import caldav, google, mappings, sync, status
 from app.api.models import ErrorResponse, ValidationErrorResponse
 
+# Import UI router
+from app.ui import router as ui_router
+
 logger = get_logger("main")
 
 
@@ -118,6 +121,9 @@ def create_app() -> FastAPI:
     app.include_router(sync.router, prefix="/api")
     app.include_router(status.router, prefix="/api")
     
+    # Include UI router
+    app.include_router(ui_router)
+    
     # Mount static files (for web UI)
     try:
         app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -127,18 +133,6 @@ def create_app() -> FastAPI:
     
     # Add exception handlers
     add_exception_handlers(app)
-    
-    # Add root endpoint
-    @app.get("/")
-    async def root():
-        """Root endpoint with basic service information."""
-        return {
-            "service": "CalDAV Sync Microservice",
-            "version": "1.0.0",
-            "status": "running",
-            "docs": "/docs" if settings.development.enable_api_docs else "disabled",
-            "api": "/api"
-        }
     
     return app
 
