@@ -46,24 +46,24 @@
                 <form id="addAccountForm">
                     <div class="mb-3">
                         <label for="accountName" class="form-label">Account Name</label>
-                        <input type="text" class="form-control" id="accountName" required>
+                        <input type="text" class="form-control" id="accountName" name="accountName" required>
                         <div class="form-text">A friendly name for this account</div>
                     </div>
                     <div class="mb-3">
                         <label for="baseUrl" class="form-label">Server URL</label>
-                        <input type="url" class="form-control" id="baseUrl" required>
+                        <input type="url" class="form-control" id="baseUrl" name="baseUrl" required>
                         <div class="form-text">CalDAV server URL (e.g., https://caldav.example.com/)</div>
                     </div>
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" required>
+                        <input type="text" class="form-control" id="username" name="username" required>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" required>
+                        <input type="password" class="form-control" id="password" name="password" required>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="verifySSL" checked>
+                        <input type="checkbox" class="form-check-input" id="verifySSL" name="verifySSL" checked>
                         <label class="form-check-label" for="verifySSL">
                             Verify SSL certificates
                         </label>
@@ -162,8 +162,17 @@ async function loadAccounts() {
 }
 
 async function testAndSaveAccount() {
+    console.log('testAndSaveAccount() called');
+    
     const form = document.getElementById('addAccountForm');
+    if (!form) {
+        console.error('Form not found!');
+        showAlert('Form not found', 'error');
+        return;
+    }
+    
     const formData = new FormData(form);
+    console.log('Form data collected');
     
     const accountData = {
         name: formData.get('accountName') || document.getElementById('accountName').value,
@@ -173,8 +182,24 @@ async function testAndSaveAccount() {
         verify_ssl: document.getElementById('verifySSL').checked
     };
     
+    console.log('Account data prepared:', {
+        name: accountData.name,
+        base_url: accountData.base_url,
+        username: accountData.username,
+        password: accountData.password ? '[REDACTED]' : 'EMPTY',
+        verify_ssl: accountData.verify_ssl
+    });
+    
+    // Validate required fields
+    if (!accountData.name || !accountData.base_url || !accountData.username || !accountData.password) {
+        console.error('Missing required fields');
+        showAlert('Please fill in all required fields', 'error');
+        return;
+    }
+    
     try {
         // First test the connection
+        console.log('Starting connection test...');
         showAlert('Testing connection...', 'info');
         
         const testResponse = await fetch('/api/caldav/test', {
@@ -283,8 +308,15 @@ function showAlert(message, type) {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
-    container.insertAdjacentHTML('afterbegin', alertHtml);
+    const container = document.querySelector('main.container');
+    if (container) {
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+    } else {
+        console.error('Could not find main container element');
+        // Fallback: try to show alert in modal or use browser alert
+        alert(message);
+        return;
+    }
     
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
