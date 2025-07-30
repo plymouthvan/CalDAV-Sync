@@ -14,37 +14,65 @@ from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class ServerConfig(BaseSettings):
     """Server configuration settings."""
-    host: str = Field(default="0.0.0.0", env="HOST")
-    port: int = Field(default=8000, env="PORT")
-    debug: bool = Field(default=False, env="DEBUG")
-    reload: bool = Field(default=False, env="RELOAD")
-    base_url: str = Field(default="http://localhost:8000", env="BASE_URL")
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=8000)
+    debug: bool = Field(default=False)
+    reload: bool = Field(default=False)
+    base_url: str = Field(default="http://localhost:8000")
+    
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
 
 
 class DatabaseConfig(BaseSettings):
     """Database configuration settings."""
-    url: str = Field(default="sqlite:///./caldav_sync.db", env="DATABASE_URL")
-    echo: bool = Field(default=False, env="DATABASE_ECHO")
+    url: str = Field(default="sqlite:///./caldav_sync.db")
+    echo: bool = Field(default=False)
+    
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
 
 
 class GoogleConfig(BaseSettings):
     """Google OAuth and Calendar API configuration."""
-    client_id: Optional[str] = Field(default=None, env="GOOGLE_CLIENT_ID")
-    client_secret: Optional[str] = Field(default=None, env="GOOGLE_CLIENT_SECRET")
+    client_id: Optional[str] = Field(default=None, alias="GOOGLE_CLIENT_ID")
+    client_secret: Optional[str] = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
     scopes: List[str] = Field(default=["https://www.googleapis.com/auth/calendar"])
     redirect_uri: str = Field(default="/oauth/callback")
+    
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
 
 
 class SecurityConfig(BaseSettings):
     """Security and encryption configuration."""
-    api_key: Optional[str] = Field(default=None, env="API_KEY")
-    secret_key: Optional[str] = Field(default="test-secret-key", env="SECRET_KEY")
-    encryption_key: Optional[str] = Field(default="test-encryption-key-32-chars-long", env="ENCRYPTION_KEY")
-    require_auth_for_external: bool = Field(default=True, env="REQUIRE_AUTH_FOR_EXTERNAL")
+    api_key: Optional[str] = Field(default=None)
+    secret_key: Optional[str] = Field(default="test-secret-key")
+    encryption_key: Optional[str] = Field(default="test-encryption-key-32-chars-long")
+    require_auth_for_external: bool = Field(default=True)
+    
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
 
 
 class SyncConfig(BaseSettings):
@@ -164,6 +192,12 @@ class Settings:
     def validate_required_settings(self) -> List[str]:
         """Validate that all required settings are present."""
         errors = []
+        
+        # Debug logging
+        print(f"DEBUG: google.client_id = '{self.google.client_id}' (type: {type(self.google.client_id)})")
+        print(f"DEBUG: google.client_secret = '{self.google.client_secret}' (type: {type(self.google.client_secret)})")
+        print(f"DEBUG: security.secret_key = '{self.security.secret_key}' (type: {type(self.security.secret_key)})")
+        print(f"DEBUG: security.encryption_key = '{self.security.encryption_key}' (type: {type(self.security.encryption_key)})")
         
         if not self.google.client_id:
             errors.append("GOOGLE_CLIENT_ID is required")
