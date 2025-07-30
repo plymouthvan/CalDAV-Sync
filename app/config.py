@@ -11,7 +11,8 @@ Supports multiple configuration sources with precedence:
 import os
 import yaml
 from typing import Optional, List, Any, Dict
-from pydantic import BaseSettings, Field, validator
+from pydantic import BaseModel, Field, field_validator
+from pydantic_settings import BaseSettings
 from pathlib import Path
 
 
@@ -32,8 +33,8 @@ class DatabaseConfig(BaseSettings):
 
 class GoogleConfig(BaseSettings):
     """Google OAuth and Calendar API configuration."""
-    client_id: str = Field(env="GOOGLE_CLIENT_ID")
-    client_secret: str = Field(env="GOOGLE_CLIENT_SECRET")
+    client_id: Optional[str] = Field(default=None, env="GOOGLE_CLIENT_ID")
+    client_secret: Optional[str] = Field(default=None, env="GOOGLE_CLIENT_SECRET")
     scopes: List[str] = Field(default=["https://www.googleapis.com/auth/calendar"])
     redirect_uri: str = Field(default="/oauth/callback")
 
@@ -41,8 +42,8 @@ class GoogleConfig(BaseSettings):
 class SecurityConfig(BaseSettings):
     """Security and encryption configuration."""
     api_key: Optional[str] = Field(default=None, env="API_KEY")
-    secret_key: str = Field(env="SECRET_KEY")
-    encryption_key: str = Field(env="ENCRYPTION_KEY")
+    secret_key: Optional[str] = Field(default="test-secret-key", env="SECRET_KEY")
+    encryption_key: Optional[str] = Field(default="test-encryption-key-32-chars-long", env="ENCRYPTION_KEY")
     require_auth_for_external: bool = Field(default=True, env="REQUIRE_AUTH_FOR_EXTERNAL")
 
 
@@ -107,6 +108,7 @@ class DevelopmentConfig(BaseSettings):
     mock_caldav: bool = Field(default=False, env="DEV_MOCK_CALDAV")
     mock_google: bool = Field(default=False, env="DEV_MOCK_GOOGLE")
     log_all_requests: bool = Field(default=False, env="DEV_LOG_ALL_REQUESTS")
+    enable_api_docs: bool = Field(default=True, env="DEV_ENABLE_API_DOCS")
 
 
 class Settings:

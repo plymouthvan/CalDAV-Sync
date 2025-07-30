@@ -503,6 +503,73 @@ class EventDiffer:
         return self.sync_direction in ["google_to_caldav", "bidirectional"]
 
 
+class ConflictResolver:
+    """Handles conflict resolution between CalDAV and Google Calendar events."""
+    
+    def __init__(self):
+        self.logger = SyncLogger("conflict_resolver", "bidirectional")
+    
+    def resolve_conflict(self, caldav_event: CalDAVEvent, google_event: GoogleCalendarEvent, changes: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Resolve conflict between CalDAV and Google Calendar events.
+        
+        Args:
+            caldav_event: CalDAV event
+            google_event: Google Calendar event
+            changes: List of detected changes
+            
+        Returns:
+            Dictionary with resolution details
+        """
+        if not changes:
+            return {
+                'winner': 'none',
+                'reason': 'no_changes',
+                'action': 'no_action'
+            }
+        
+        caldav_modified = caldav_event.last_modified
+        google_modified = google_event.updated
+        
+        if caldav_modified and google_modified:
+            if caldav_modified > google_modified:
+                return {
+                    'winner': 'caldav',
+                    'reason': 'caldav_newer',
+                    'action': 'update_google'
+                }
+            elif google_modified > caldav_modified:
+                return {
+                    'winner': 'google',
+                    'reason': 'google_newer',
+                    'action': 'update_caldav'
+                }
+            else:
+                return {
+                    'winner': 'caldav',
+                    'reason': 'caldav_fallback',
+                    'action': 'update_google'
+                }
+        elif caldav_modified:
+            return {
+                'winner': 'caldav',
+                'reason': 'only_caldav_timestamp',
+                'action': 'update_google'
+            }
+        elif google_modified:
+            return {
+                'winner': 'google',
+                'reason': 'only_google_timestamp',
+                'action': 'update_caldav'
+            }
+        else:
+            return {
+                'winner': 'caldav',
+                'reason': 'caldav_fallback',
+                'action': 'update_google'
+            }
+
+
 def create_event_differ(mapping_id: str, sync_direction: str) -> EventDiffer:
     """Create an EventDiffer instance for the given mapping and direction."""
     return EventDiffer(mapping_id, sync_direction)

@@ -12,7 +12,7 @@ from typing import Optional, List
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
-from sqlalchemy.dialects.sqlite import UUID
+# UUID support for SQLite using String
 from cryptography.fernet import Fernet
 
 from app.config import get_settings

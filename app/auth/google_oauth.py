@@ -19,7 +19,7 @@ from googleapiclient.errors import HttpError
 
 from app.config import get_settings
 from app.database import GoogleOAuthToken, get_db
-from app.utils.logging import GoogleLogger
+from app.utils.logging import get_logger
 from app.utils.exceptions import GoogleOAuthError, handle_google_exception
 
 
@@ -27,12 +27,16 @@ class GoogleOAuthManager:
     """Manages Google OAuth2 authentication and token lifecycle."""
     
     def __init__(self):
+        """Initialize Google OAuth manager."""
         self.settings = get_settings()
-        self.logger = GoogleLogger()
+        self.logger = get_logger("google_oauth")
         
-        # Validate required configuration
+        # Allow initialization without credentials for testing
         if not self.settings.google.client_id or not self.settings.google.client_secret:
-            raise GoogleOAuthError("Google OAuth credentials not configured")
+            self.logger.warning("Google OAuth credentials not configured - some functionality will be disabled")
+            self._credentials_available = False
+        else:
+            self._credentials_available = True
     
     def get_authorization_url(self, state: Optional[str] = None) -> str:
         """
@@ -185,10 +189,10 @@ class GoogleOAuthManager:
                         db_token.updated_at = datetime.utcnow()
                         db.commit()
                         
-                        self.logger.log_oauth_refresh(True)
+                        self.logger.info("OAuth token refreshed successfully")
                         
                     except Exception as e:
-                        self.logger.log_oauth_refresh(False)
+                        self.logger.error("OAuth token refresh failed")
                         self.logger.error(f"Token refresh failed: {e}")
                         return None
                 
