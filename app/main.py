@@ -43,25 +43,59 @@ async def lifespan(app: FastAPI):
     logger.info("Starting CalDAV Sync Microservice...")
     
     try:
+        # Validate required configuration
+        logger.info("Validating configuration...")
+        config_errors = settings.validate_required_settings()
+        if config_errors:
+            logger.error(f"Configuration validation failed: {config_errors}")
+            raise ValueError(f"Missing required configuration: {', '.join(config_errors)}")
+        logger.info("Configuration validation passed")
+        
+        # Test encryption key format
+        logger.info("Testing encryption key...")
+        try:
+            from cryptography.fernet import Fernet
+            test_fernet = Fernet(settings.security.encryption_key.encode())
+            logger.info("Encryption key format is valid")
+        except Exception as e:
+            logger.error(f"Invalid encryption key format: {e}")
+            raise ValueError(f"Invalid ENCRYPTION_KEY format: {e}")
+        
         # Initialize database
-        db_manager = get_database_manager()
-        db_manager.create_tables()
-        logger.info("Database initialized")
+        logger.info("Initializing database...")
+        try:
+            db_manager = get_database_manager()
+            db_manager.create_tables()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            raise
         
         # Start scheduler
-        scheduler = get_sync_scheduler()
-        await scheduler.start()
-        logger.info("Sync scheduler started")
+        logger.info("Starting sync scheduler...")
+        try:
+            scheduler = get_sync_scheduler()
+            await scheduler.start()
+            logger.info("Sync scheduler started successfully")
+        except Exception as e:
+            logger.error(f"Sync scheduler startup failed: {e}")
+            raise
         
         # Start webhook retry processor
-        webhook_processor = get_webhook_retry_processor()
-        await webhook_processor.start()
-        logger.info("Webhook retry processor started")
+        logger.info("Starting webhook retry processor...")
+        try:
+            webhook_processor = get_webhook_retry_processor()
+            await webhook_processor.start()
+            logger.info("Webhook retry processor started successfully")
+        except Exception as e:
+            logger.error(f"Webhook retry processor startup failed: {e}")
+            raise
         
         logger.info("CalDAV Sync Microservice startup complete")
         
     except Exception as e:
-        logger.error(f"Startup failed: {e}")
+        logger.error(f"Startup failed with error: {type(e).__name__}: {e}")
+        logger.error(f"Full error details:", exc_info=True)
         raise
     
     yield
