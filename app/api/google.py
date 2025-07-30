@@ -119,19 +119,29 @@ async def revoke_oauth_token(
     __: bool = Depends(check_rate_limit)
 ):
     """Revoke the current OAuth token."""
+    logger.info("=== REVOKE TOKEN REQUEST RECEIVED ===")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Request URL: {request.url}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
     try:
         oauth_manager = get_oauth_manager()
+        logger.info("OAuth manager obtained, attempting to revoke tokens...")
+        
         success = oauth_manager.revoke_tokens()
+        logger.info(f"Revoke tokens result: {success}")
         
         if not success:
+            logger.error("OAuth manager returned False for revoke_tokens()")
             raise HTTPException(status_code=500, detail="Failed to revoke OAuth token")
         
         logger.info("Google OAuth token revoked successfully")
         
     except HTTPException:
+        logger.error("HTTPException during token revocation")
         raise
     except Exception as e:
-        logger.error(f"Failed to revoke OAuth token: {e}")
+        logger.error(f"Failed to revoke OAuth token: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to revoke OAuth token")
 
 
@@ -142,23 +152,35 @@ async def test_oauth_credentials(
     __: bool = Depends(check_rate_limit)
 ):
     """Test the current OAuth credentials."""
+    logger.info("=== TEST CREDENTIALS REQUEST RECEIVED ===")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Request URL: {request.url}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
     try:
         oauth_manager = get_oauth_manager()
-        success, error_message = oauth_manager.test_credentials()
+        logger.info("OAuth manager obtained, testing credentials...")
         
-        return {
+        success, error_message = oauth_manager.test_credentials()
+        logger.info(f"Test credentials result: success={success}, error={error_message}")
+        
+        result = {
             "success": success,
             "error_message": error_message,
             "tested_at": datetime.utcnow().isoformat()
         }
+        logger.info(f"Returning test result: {result}")
+        return result
         
     except Exception as e:
-        logger.error(f"OAuth credentials test failed: {e}")
-        return {
+        logger.error(f"OAuth credentials test failed: {e}", exc_info=True)
+        result = {
             "success": False,
             "error_message": str(e),
             "tested_at": datetime.utcnow().isoformat()
         }
+        logger.info(f"Returning error result: {result}")
+        return result
 
 
 @router.get("/calendars", response_model=List[GoogleCalendarResponse])
@@ -346,7 +368,12 @@ async def revoke_oauth_token_alias(
     __: bool = Depends(check_rate_limit)
 ):
     """Alias for revoke endpoint."""
+    logger.info("=== REVOKE AUTH ALIAS REQUEST RECEIVED ===")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Request URL: {request.url}")
+    
     await revoke_oauth_token(request, _, __)
+    logger.info("Revoke completed successfully, returning success message")
     return {"message": "Authentication revoked successfully"}
 
 @router.post("/test")
@@ -356,7 +383,13 @@ async def test_oauth_credentials_alias(
     __: bool = Depends(check_rate_limit)
 ):
     """Alias for oauth/test endpoint."""
-    return await test_oauth_credentials(request, _, __)
+    logger.info("=== TEST ALIAS REQUEST RECEIVED ===")
+    logger.info(f"Request method: {request.method}")
+    logger.info(f"Request URL: {request.url}")
+    
+    result = await test_oauth_credentials(request, _, __)
+    logger.info(f"Test alias returning result: {result}")
+    return result
 
 
 @router.post("/refresh-token")

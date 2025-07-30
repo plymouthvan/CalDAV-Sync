@@ -246,14 +246,24 @@ class GoogleOAuthManager:
                 db_token = db.query(GoogleOAuthToken).first()
                 
                 if not db_token:
+                    self.logger.debug("No OAuth token found in database")
                     return None
                 
                 credentials = self.get_valid_credentials()
+                encryption_key = self.settings.security.encryption_key
+                
+                # Get refresh token status
+                refresh_token = db_token.get_refresh_token(encryption_key) if db_token else None
+                has_refresh_token = bool(refresh_token)
+                
+                self.logger.debug(f"Token info - has_token: {bool(credentials)}, expires_at: {db_token.expires_at}, has_refresh_token: {has_refresh_token}")
                 
                 return {
                     "has_token": bool(credentials),
                     "is_expired": credentials.expired if credentials else True,
                     "expires_at": db_token.expires_at.isoformat() if db_token.expires_at else None,
+                    "has_refresh_token": has_refresh_token,
+                    "token_type": db_token.token_type or "Bearer",
                     "scopes": json.loads(db_token.scopes) if db_token.scopes else [],
                     "created_at": db_token.created_at.isoformat(),
                     "updated_at": db_token.updated_at.isoformat(),

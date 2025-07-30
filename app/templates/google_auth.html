@@ -317,10 +317,16 @@ function updateButtonStates(hasCredentials, isAuthenticated, tokenValid, tokenEx
     const refreshTokenBtn = document.getElementById('refresh-token-btn');
     const revokeAuthBtn = document.getElementById('revoke-auth-btn');
     
+    console.log('Button states - hasCredentials:', hasCredentials, 'isAuthenticated:', isAuthenticated, 'tokenValid:', tokenValid, 'tokenExpired:', tokenExpired);
+    
     startAuthBtn.disabled = !hasCredentials || isAuthenticated;
-    testConnectionBtn.disabled = !isAuthenticated || !tokenValid;
+    // Allow test connection if we have credentials, even if token appears invalid
+    testConnectionBtn.disabled = !hasCredentials;
     refreshTokenBtn.disabled = !isAuthenticated || (!tokenExpired && tokenValid);
-    revokeAuthBtn.disabled = !isAuthenticated;
+    // Allow revoke if we have any authentication data
+    revokeAuthBtn.disabled = !hasCredentials;
+    
+    console.log('Button disabled states - test:', testConnectionBtn.disabled, 'revoke:', revokeAuthBtn.disabled);
 }
 
 function loadTokenDetails(data) {
@@ -431,13 +437,18 @@ async function testConnection() {
     try {
         showAlert('Testing connection...', 'info');
         
-        const response = await fetch('/api/google/test');
+        const response = await fetch('/api/google/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         const data = await response.json();
         
-        if (response.ok) {
+        if (response.ok && data.success) {
             showAlert('Connection test successful!', 'success');
         } else {
-            showAlert('Connection test failed: ' + (data.detail || 'Unknown error'), 'error');
+            showAlert('Connection test failed: ' + (data.error_message || data.detail || 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Error testing connection:', error);
@@ -472,14 +483,19 @@ async function revokeAuthentication() {
     try {
         showAlert('Revoking authentication...', 'info');
         
-        const response = await fetch('/api/google/auth/revoke', { method: 'POST' });
+        const response = await fetch('/api/google/auth/revoke', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         const data = await response.json();
         
         if (response.ok) {
             showAlert('Authentication revoked successfully!', 'success');
             loadAuthStatus();
         } else {
-            showAlert('Failed to revoke authentication: ' + (data.detail || 'Unknown error'), 'error');
+            showAlert('Failed to revoke authentication: ' + (data.detail || data.message || 'Unknown error'), 'error');
         }
     } catch (error) {
         console.error('Error revoking authentication:', error);
@@ -502,6 +518,7 @@ function refreshAuthStatus() {
 }
 
 function showAlert(message, type) {
+    console.log('showAlert called:', message, type);
     const alertHtml = `
         <div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show" role="alert">
             ${message}
@@ -509,16 +526,34 @@ function showAlert(message, type) {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
-    container.insertAdjacentHTML('afterbegin', alertHtml);
+    // Try multiple container selectors
+    let container = document.querySelector('main .container');
+    if (!container) {
+        container = document.querySelector('.container');
+    }
+    if (!container) {
+        container = document.querySelector('main');
+    }
+    if (!container) {
+        container = document.body;
+    }
     
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-        const alert = container.querySelector('.alert');
-        if (alert) {
-            alert.remove();
-        }
-    }, 5000);
+    console.log('Container found:', container);
+    
+    if (container) {
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            const alert = container.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
+        }, 5000);
+    } else {
+        // Fallback: use browser alert
+        alert(message);
+    }
 }
 </script>
 {% endblock %}
