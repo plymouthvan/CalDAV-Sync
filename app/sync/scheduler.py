@@ -22,6 +22,56 @@ from app.utils.exceptions import SyncError
 logger = get_logger("scheduler")
 
 
+async def sync_mapping_job(mapping_id: str):
+    """
+    Standalone function for sync job execution to avoid serialization issues.
+    
+    Args:
+        mapping_id: ID of mapping to sync
+    """
+    from app.sync.scheduler import get_sync_scheduler
+    
+    scheduler = get_sync_scheduler()
+    
+    # Check if sync is already running
+    if mapping_id in scheduler.active_jobs:
+        logger.warning(f"Sync already running for mapping {mapping_id}, skipping")
+        return
+    
+    # Mark as active
+    scheduler.active_jobs[mapping_id] = datetime.utcnow()
+    
+    try:
+        # Get mapping from database
+        with next(get_db()) as db:
+            mapping = db.query(CalendarMapping).filter(
+                CalendarMapping.id == mapping_id
+            ).first()
+            
+            if not mapping:
+                logger.error(f"Mapping {mapping_id} not found")
+                return
+            
+            if not mapping.enabled:
+                logger.info(f"Mapping {mapping_id} is disabled, skipping sync")
+                return
+        
+        # Execute sync
+        result = await scheduler.sync_engine.sync_mapping(mapping)
+        
+        logger.info(
+            f"Sync completed for mapping {mapping_id}: "
+            f"{result.status} ({result.inserted_count}I/{result.updated_count}U/{result.deleted_count}D)"
+        )
+        
+    except Exception as e:
+        logger.error(f"Sync failed for mapping {mapping_id}: {e}")
+        
+    finally:
+        # Remove from active jobs
+        scheduler.active_jobs.pop(mapping_id, None)
+
+
 class SyncScheduler:
     """Manages scheduled sync jobs for calendar mappings."""
     
@@ -126,7 +176,7 @@ class SyncScheduler:
             logger.info(f"Sync interval: {mapping.sync_interval_minutes} minutes")
             
             self.scheduler.add_job(
-                self._sync_mapping_with_lock,
+                sync_mapping_job,  # Use standalone function instead of instance method
                 'interval',
                 minutes=mapping.sync_interval_minutes,
                 id=job_id,
@@ -186,7 +236,7 @@ class SyncScheduler:
                 return False
         
         # Execute sync in background
-        asyncio.create_task(self._sync_mapping_with_lock(mapping_id))
+        asyncio.create_task(sync_mapping_job(mapping_id))
         return True
     
     async def trigger_manual_sync_all(self) -> int:
@@ -209,51 +259,6 @@ class SyncScheduler:
         
         logger.info(f"Triggered manual sync for {triggered_count} mappings")
         return triggered_count
-    
-    async def _sync_mapping_with_lock(self, mapping_id: str):
-        """
-        Execute sync with concurrency protection.
-        
-        Args:
-            mapping_id: ID of mapping to sync
-        """
-        # Check if sync is already running
-        if mapping_id in self.active_jobs:
-            logger.warning(f"Sync already running for mapping {mapping_id}, skipping")
-            return
-        
-        # Mark as active
-        self.active_jobs[mapping_id] = datetime.utcnow()
-        
-        try:
-            # Get mapping from database
-            with next(get_db()) as db:
-                mapping = db.query(CalendarMapping).filter(
-                    CalendarMapping.id == mapping_id
-                ).first()
-                
-                if not mapping:
-                    logger.error(f"Mapping {mapping_id} not found")
-                    return
-                
-                if not mapping.enabled:
-                    logger.info(f"Mapping {mapping_id} is disabled, skipping sync")
-                    return
-            
-            # Execute sync
-            result = await self.sync_engine.sync_mapping(mapping)
-            
-            logger.info(
-                f"Sync completed for mapping {mapping_id}: "
-                f"{result.status} ({result.inserted_count}I/{result.updated_count}U/{result.deleted_count}D)"
-            )
-            
-        except Exception as e:
-            logger.error(f"Sync failed for mapping {mapping_id}: {e}")
-            
-        finally:
-            # Remove from active jobs
-            self.active_jobs.pop(mapping_id, None)
     
     def _job_executed(self, event):
         """Handle job execution event."""
