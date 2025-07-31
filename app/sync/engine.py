@@ -495,7 +495,8 @@ class SyncEngine:
                 # Ensure timezone awareness
                 if update_time.tzinfo is None:
                     update_time = pytz.UTC.localize(update_time)
-                logger.info(f"EVENT MAPPING DATETIME DEBUG: updated_at={update_time} (tzinfo: {update_time.tzinfo})")
+                # Note: logger is not available in this scope, using print for debugging
+                print(f"EVENT MAPPING DATETIME DEBUG: updated_at={update_time} (tzinfo: {update_time.tzinfo})")
                 existing.updated_at = update_time
             else:
                 # Create new mapping
