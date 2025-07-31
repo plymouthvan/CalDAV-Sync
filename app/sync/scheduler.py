@@ -105,23 +105,44 @@ class SyncScheduler:
         """
         job_id = f"sync_mapping_{mapping.id}"
         
+        # Debug logging for pickle issue diagnosis
+        logger.info("=== SCHEDULE MAPPING DEBUG ===")
+        logger.info(f"Mapping ID: {mapping.id}")
+        logger.info(f"Mapping type: {type(mapping)}")
+        logger.info(f"Mapping attributes: {[attr for attr in dir(mapping) if not attr.startswith('_')]}")
+        
+        # Check if mapping has any logger attributes
+        logger_attrs = [attr for attr in dir(mapping) if 'log' in attr.lower()]
+        logger.info(f"Logger-related attributes: {logger_attrs}")
+        
         # Remove existing job if present
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
         
-        # Add new job
-        self.scheduler.add_job(
-            self._sync_mapping_with_lock,
-            'interval',
-            minutes=mapping.sync_interval_minutes,
-            id=job_id,
-            args=[mapping.id],
-            max_instances=1,  # Prevent overlapping runs
-            replace_existing=True,
-            next_run_time=datetime.utcnow() + timedelta(seconds=30)  # Start in 30 seconds
-        )
-        
-        logger.info(f"Scheduled mapping {mapping.id} with {mapping.sync_interval_minutes}min interval")
+        try:
+            # Add new job - pass only the mapping ID, not the entire object
+            logger.info(f"Adding job with ID: {job_id}")
+            logger.info(f"Job args: [{mapping.id}]")
+            logger.info(f"Sync interval: {mapping.sync_interval_minutes} minutes")
+            
+            self.scheduler.add_job(
+                self._sync_mapping_with_lock,
+                'interval',
+                minutes=mapping.sync_interval_minutes,
+                id=job_id,
+                args=[mapping.id],  # Only pass the ID, not the entire object
+                max_instances=1,  # Prevent overlapping runs
+                replace_existing=True,
+                next_run_time=datetime.utcnow() + timedelta(seconds=30)  # Start in 30 seconds
+            )
+            
+            logger.info(f"Successfully scheduled mapping {mapping.id} with {mapping.sync_interval_minutes}min interval")
+            
+        except Exception as e:
+            logger.error(f"Failed to schedule mapping {mapping.id}: {type(e).__name__}: {e}")
+            logger.error(f"Scheduler state: running={self.scheduler.running}")
+            logger.error(f"Job store type: {type(self.scheduler._jobstores['default'])}")
+            raise
     
     async def unschedule_mapping(self, mapping_id: str):
         """

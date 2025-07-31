@@ -97,12 +97,23 @@ class CalDAVClient:
                 try:
                     self.logger.info(f"Processing calendar {i+1}: {cal.url}")
                     
-                    # Get basic calendar properties - avoid CalendarDescription which doesn't exist
-                    props = cal.get_properties([
-                        caldav.dav.DisplayName(),
-                        caldav.dav.CalendarColor(),
-                        caldav.dav.CalendarTimeZone(),
-                    ])
+                    # Get basic calendar properties - avoid CalendarColor which may not exist in all caldav versions
+                    try:
+                        props = cal.get_properties([
+                            caldav.dav.DisplayName(),
+                            caldav.dav.CalendarTimeZone(),
+                        ])
+                        
+                        # Try to get CalendarColor separately to handle version compatibility
+                        try:
+                            color_props = cal.get_properties([caldav.dav.CalendarColor()])
+                            props.update(color_props)
+                        except (AttributeError, Exception) as color_e:
+                            self.logger.warning(f"CalendarColor not supported in this caldav version: {color_e}")
+                            
+                    except Exception as props_e:
+                        self.logger.warning(f"Failed to get calendar properties: {props_e}")
+                        props = {}
                     
                     self.logger.info(f"Retrieved properties for calendar {cal.url}: {list(props.keys())}")
                     
@@ -110,7 +121,13 @@ class CalDAVClient:
                     name = str(props.get(caldav.dav.DisplayName.tag, calendar_id))
                     # Skip description since CalendarDescription doesn't exist
                     description = None
-                    color = str(props.get(caldav.dav.CalendarColor.tag, '')) or None
+                    # Handle CalendarColor safely
+                    color = None
+                    try:
+                        color = str(props.get(caldav.dav.CalendarColor.tag, '')) or None
+                    except (AttributeError, NameError):
+                        # CalendarColor not available in this caldav version
+                        pass
                     timezone = str(props.get(caldav.dav.CalendarTimeZone.tag, '')) or None
                     
                     self.logger.info(f"Calendar details - ID: {calendar_id}, Name: {name}, Color: {color}, Timezone: {timezone}")

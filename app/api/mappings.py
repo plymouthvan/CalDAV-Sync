@@ -119,10 +119,31 @@ async def create_calendar_mapping(
         db.commit()
         db.refresh(db_mapping)
         
+        logger.info("=== MAPPING CREATION DEBUG ===")
+        logger.info(f"Created mapping ID: {db_mapping.id}")
+        logger.info(f"Mapping enabled: {db_mapping.enabled}")
+        logger.info(f"Mapping type: {type(db_mapping)}")
+        
         # Schedule sync job if enabled
         if db_mapping.enabled:
-            scheduler = get_sync_scheduler()
-            await scheduler.schedule_mapping(db_mapping)
+            try:
+                logger.info("Attempting to schedule mapping...")
+                scheduler = get_sync_scheduler()
+                logger.info(f"Got scheduler: {type(scheduler)}")
+                
+                # Detach the object from the session to avoid serialization issues
+                db.expunge(db_mapping)
+                logger.info("Detached mapping from database session")
+                
+                await scheduler.schedule_mapping(db_mapping)
+                logger.info("Successfully scheduled mapping")
+                
+            except Exception as e:
+                logger.error(f"Failed to schedule mapping: {type(e).__name__}: {e}")
+                logger.error(f"Error details: {str(e)}")
+                # Don't fail the entire operation if scheduling fails
+                # The mapping is created, just not scheduled
+                logger.warning("Mapping created but not scheduled - manual scheduling may be required")
         
         logger.info(f"Created calendar mapping: {db_mapping.id}")
         return CalendarMappingResponse.from_orm(db_mapping)
