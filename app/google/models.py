@@ -223,8 +223,16 @@ class GoogleCalendarEvent:
                 if start_data.get("dateTime"):
                     start_dt = date_parser.parse(start_data["dateTime"])
                     timezone = start_data.get("timeZone") or (str(start_dt.tzinfo) if start_dt.tzinfo else None)
+                    # Ensure timezone awareness
+                    if start_dt and start_dt.tzinfo is None:
+                        start_dt = pytz.UTC.localize(start_dt)
+                        print(f"GOOGLE MODEL DEBUG: normalized start_dt to UTC: {start_dt}")
                 if end_data.get("dateTime"):
                     end_dt = date_parser.parse(end_data["dateTime"])
+                    # Ensure timezone awareness
+                    if end_dt and end_dt.tzinfo is None:
+                        end_dt = pytz.UTC.localize(end_dt)
+                        print(f"GOOGLE MODEL DEBUG: normalized end_dt to UTC: {end_dt}")
             
             # Extract recurrence
             recurrence = api_data.get("recurrence")
@@ -236,11 +244,19 @@ class GoogleCalendarEvent:
                 updated = date_parser.parse(api_data["updated"])
                 # Add diagnostic logging for datetime parsing
                 print(f"GOOGLE MODEL DEBUG: updated={updated} (type: {type(updated)}, tzinfo: {getattr(updated, 'tzinfo', None)})")
+                # Ensure timezone awareness - if naive, assume UTC
+                if updated and updated.tzinfo is None:
+                    updated = pytz.UTC.localize(updated)
+                    print(f"GOOGLE MODEL DEBUG: normalized updated to UTC: {updated}")
             
             created = None
             if api_data.get("created"):
                 created = date_parser.parse(api_data["created"])
                 print(f"GOOGLE MODEL DEBUG: created={created} (type: {type(created)}, tzinfo: {getattr(created, 'tzinfo', None)})")
+                # Ensure timezone awareness - if naive, assume UTC
+                if created and created.tzinfo is None:
+                    created = pytz.UTC.localize(created)
+                    print(f"GOOGLE MODEL DEBUG: normalized created to UTC: {created}")
             
             return cls(
                 id=event_id,

@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
+import pytz
 
 from app.caldav.models import CalDAVEvent
 from app.google.models import GoogleCalendarEvent
@@ -271,7 +272,18 @@ class EventDiffer:
         last_caldav_sync = mapping.last_caldav_modified if mapping else None
         last_google_sync = mapping.last_google_updated if mapping else None
         
-        # Determine if each side has changes
+        # Normalize datetime objects to ensure timezone awareness before comparison
+        def normalize_datetime(dt):
+            """Ensure datetime is timezone-aware (assume UTC if naive)."""
+            if dt and isinstance(dt, datetime) and dt.tzinfo is None:
+                return pytz.UTC.localize(dt)
+            return dt
+        
+        caldav_modified = normalize_datetime(caldav_modified)
+        google_modified = normalize_datetime(google_modified)
+        last_caldav_sync = normalize_datetime(last_caldav_sync)
+        last_google_sync = normalize_datetime(last_google_sync)
+        
         # Add diagnostic logging for datetime comparison issue
         self.logger.info(f"DATETIME DEBUG for UID {caldav_event.uid}:")
         self.logger.info(f"  caldav_modified: {caldav_modified} (type: {type(caldav_modified)}, tzinfo: {getattr(caldav_modified, 'tzinfo', None)})")
@@ -363,6 +375,16 @@ class EventDiffer:
         """
         caldav_modified = caldav_event.last_modified
         google_modified = google_event.updated
+        
+        # Normalize datetime objects to ensure timezone awareness before comparison
+        def normalize_datetime(dt):
+            """Ensure datetime is timezone-aware (assume UTC if naive)."""
+            if dt and isinstance(dt, datetime) and dt.tzinfo is None:
+                return pytz.UTC.localize(dt)
+            return dt
+        
+        caldav_modified = normalize_datetime(caldav_modified)
+        google_modified = normalize_datetime(google_modified)
         
         # Add diagnostic logging for datetime comparison issue
         self.logger.info(f"CONFLICT RESOLUTION DEBUG for UID {caldav_event.uid}:")

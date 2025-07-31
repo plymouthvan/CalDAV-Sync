@@ -8,6 +8,7 @@ conflict resolution, and applying changes with webhook notifications.
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
+import pytz
 
 from app.database import (
     CalendarMapping, EventMapping, SyncLog, CalDAVAccount as DBCalDAVAccount,
@@ -70,6 +71,9 @@ class SyncEngine:
         logger = SyncLogger(mapping.id, mapping.sync_direction)
         
         start_time = datetime.utcnow()
+        # Ensure timezone awareness
+        if start_time.tzinfo is None:
+            start_time = pytz.UTC.localize(start_time)
         logger.info(f"SYNC ENGINE DATETIME DEBUG: started_at={start_time} (tzinfo: {start_time.tzinfo})")
         
         result = SyncResult(
@@ -114,6 +118,9 @@ class SyncEngine:
                 result.status = "failure"
             
             result.completed_at = datetime.utcnow()
+            # Ensure timezone awareness
+            if result.completed_at.tzinfo is None:
+                result.completed_at = pytz.UTC.localize(result.completed_at)
             logger.info(f"SYNC ENGINE DATETIME DEBUG: completed_at={result.completed_at} (tzinfo: {result.completed_at.tzinfo})")
             result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
             
@@ -482,6 +489,9 @@ class SyncEngine:
                 existing.sync_direction_last = sync_direction
                 existing.event_hash = event_hash
                 update_time = datetime.utcnow()
+                # Ensure timezone awareness
+                if update_time.tzinfo is None:
+                    update_time = pytz.UTC.localize(update_time)
                 logger.info(f"EVENT MAPPING DATETIME DEBUG: updated_at={update_time} (tzinfo: {update_time.tzinfo})")
                 existing.updated_at = update_time
             else:

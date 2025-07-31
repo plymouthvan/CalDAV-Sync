@@ -182,6 +182,15 @@ class CalDAVEvent:
             # Determine if all-day event
             all_day = isinstance(start_dt, date) and not isinstance(start_dt, datetime)
             
+            # Ensure timezone awareness for timed events
+            if not all_day:
+                if start_dt and isinstance(start_dt, datetime) and start_dt.tzinfo is None:
+                    start_dt = pytz.UTC.localize(start_dt)
+                    print(f"CALDAV MODEL DEBUG: normalized start_dt to UTC: {start_dt}")
+                if end_dt and isinstance(end_dt, datetime) and end_dt.tzinfo is None:
+                    end_dt = pytz.UTC.localize(end_dt)
+                    print(f"CALDAV MODEL DEBUG: normalized end_dt to UTC: {end_dt}")
+            
             # Extract timezone
             timezone = None
             if not all_day and isinstance(start_dt, datetime) and start_dt.tzinfo:
@@ -203,11 +212,19 @@ class CalDAVEvent:
                 last_modified = ical_event.get('LAST-MODIFIED').dt
                 # Add diagnostic logging for datetime parsing
                 print(f"CALDAV MODEL DEBUG: last_modified={last_modified} (type: {type(last_modified)}, tzinfo: {getattr(last_modified, 'tzinfo', None)})")
+                # Ensure timezone awareness - if naive, assume UTC
+                if last_modified and last_modified.tzinfo is None:
+                    last_modified = pytz.UTC.localize(last_modified)
+                    print(f"CALDAV MODEL DEBUG: normalized last_modified to UTC: {last_modified}")
             
             created = None
             if ical_event.get('CREATED'):
                 created = ical_event.get('CREATED').dt
                 print(f"CALDAV MODEL DEBUG: created={created} (type: {type(created)}, tzinfo: {getattr(created, 'tzinfo', None)})")
+                # Ensure timezone awareness - if naive, assume UTC
+                if created and created.tzinfo is None:
+                    created = pytz.UTC.localize(created)
+                    print(f"CALDAV MODEL DEBUG: normalized created to UTC: {created}")
             
             sequence = int(ical_event.get('SEQUENCE', 0))
             
