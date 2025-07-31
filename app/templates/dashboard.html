@@ -134,8 +134,8 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 data-bs-toggle="tooltip"
-                    title="Latest sync operations with their status and event counts">
-                    <i class="bi bi-clock-history"></i> Recent Sync Activity
+                    title="Recent sync operations that resulted in actual changes (added, updated, or removed events). Empty sync polls are filtered out for clarity.">
+                    <i class="bi bi-arrow-left-right"></i> Recent Sync Changes
                 </h5>
                 <a href="{{ url_for('sync_history') }}" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
