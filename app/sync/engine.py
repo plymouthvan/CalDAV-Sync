@@ -145,18 +145,23 @@ class SyncEngine:
         finally:
             # Update sync log
             with next(get_db()) as db:
-                sync_log.status = result.status
-                sync_log.inserted_count = result.inserted_count
-                sync_log.updated_count = result.updated_count
-                sync_log.deleted_count = result.deleted_count
-                sync_log.error_count = result.error_count
-                sync_log.error_message = "; ".join(result.errors) if result.errors else None
-                sync_log.completed_at = result.completed_at
-                sync_log.duration_seconds = int(result.duration_seconds) if result.duration_seconds else None
+                # Re-fetch the sync log to ensure it's attached to this session
+                db_sync_log = db.query(SyncLog).filter(SyncLog.id == sync_log.id).first()
+                if db_sync_log:
+                    db_sync_log.status = result.status
+                    db_sync_log.inserted_count = result.inserted_count
+                    db_sync_log.updated_count = result.updated_count
+                    db_sync_log.deleted_count = result.deleted_count
+                    db_sync_log.error_count = result.error_count
+                    db_sync_log.error_message = "; ".join(result.errors) if result.errors else None
+                    db_sync_log.completed_at = result.completed_at
+                    db_sync_log.duration_seconds = int(result.duration_seconds) if result.duration_seconds else None
                 
-                # Update mapping last sync info
-                mapping.last_sync_at = result.completed_at
-                mapping.last_sync_status = result.status
+                # Re-fetch the mapping to ensure it's attached to this session
+                db_mapping = db.query(CalendarMapping).filter(CalendarMapping.id == mapping.id).first()
+                if db_mapping:
+                    db_mapping.last_sync_at = result.completed_at
+                    db_mapping.last_sync_status = result.status
                 
                 db.commit()
             
