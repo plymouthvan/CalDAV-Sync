@@ -162,10 +162,25 @@ class GoogleCalendarClient:
             page_token = None
             
             while True:
+                # Convert to UTC and format for Google Calendar API
+                if start_date.tzinfo is not None:
+                    start_date_utc = start_date.astimezone(pytz.UTC)
+                else:
+                    start_date_utc = pytz.UTC.localize(start_date)
+                
+                if end_date.tzinfo is not None:
+                    end_date_utc = end_date.astimezone(pytz.UTC)
+                else:
+                    end_date_utc = pytz.UTC.localize(end_date)
+                
+                # Format as RFC3339 without timezone offset (Google expects 'Z' for UTC)
+                time_min = start_date_utc.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+                time_max = end_date_utc.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+                
                 request = service.events().list(
                     calendarId=calendar_id,
-                    timeMin=start_date.isoformat() + 'Z',
-                    timeMax=end_date.isoformat() + 'Z',
+                    timeMin=time_min,
+                    timeMax=time_max,
                     singleEvents=single_events,
                     orderBy='startTime',
                     maxResults=self.settings.google_calendar.max_results_per_request,
