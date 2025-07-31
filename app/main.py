@@ -72,6 +72,28 @@ async def lifespan(app: FastAPI):
             logger.error(f"Current key appears to be plain text, not base64-encoded")
             raise ValueError(f"Invalid ENCRYPTION_KEY format: {e}")
         
+        # Log container environment info
+        import os
+        logger.info(f"=== CONTAINER ENVIRONMENT DEBUG ===")
+        logger.info(f"Current working directory: {os.getcwd()}")
+        logger.info(f"Container hostname: {os.environ.get('HOSTNAME', 'unknown')}")
+        logger.info(f"User ID: {os.getuid()}")
+        logger.info(f"Group ID: {os.getgid()}")
+        
+        # Log database configuration
+        logger.info(f"=== DATABASE CONFIGURATION DEBUG ===")
+        logger.info(f"DATABASE_URL environment variable: {os.environ.get('DATABASE_URL', 'NOT SET')}")
+        logger.info(f"Resolved database URL: {settings.database.url}")
+        
+        # Check data directory
+        data_dir = "/app/data"
+        logger.info(f"Data directory exists: {os.path.exists(data_dir)}")
+        if os.path.exists(data_dir):
+            logger.info(f"Data directory contents: {os.listdir(data_dir)}")
+            logger.info(f"Data directory permissions: {oct(os.stat(data_dir).st_mode)[-3:]}")
+        else:
+            logger.warning(f"Data directory {data_dir} does not exist!")
+        
         # Initialize database
         logger.info("Initializing database...")
         try:

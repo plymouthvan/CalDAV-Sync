@@ -37,8 +37,8 @@ class ServerConfig(BaseSettings):
 
 class DatabaseConfig(BaseSettings):
     """Database configuration settings."""
-    url: str = Field(default="sqlite:///./caldav_sync.db")
-    echo: bool = Field(default=False)
+    url: str = Field(default="sqlite:///./data/caldav_sync.db", env="DATABASE_URL")
+    echo: bool = Field(default=False, env="DATABASE_ECHO")
     
     model_config = {
         "env_file": ".env",

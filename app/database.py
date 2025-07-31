@@ -220,10 +220,65 @@ class DatabaseManager:
         """Create all database tables."""
         try:
             from app.utils.logging import get_logger
+            import os
             logger = get_logger("database")
+            
+            # Extract database file path for SQLite
+            db_file_path = None
+            if "sqlite:///" in self.database_url:
+                db_file_path = self.database_url.replace("sqlite:///", "")
+                if db_file_path.startswith("./"):
+                    db_file_path = os.path.abspath(db_file_path)
+            
+            logger.info(f"=== DATABASE PERSISTENCE DEBUG ===")
+            logger.info(f"Database URL: {self.database_url}")
+            logger.info(f"Database file path: {db_file_path}")
+            
+            if db_file_path:
+                db_dir = os.path.dirname(db_file_path)
+                logger.info(f"Database directory: {db_dir}")
+                logger.info(f"Database directory exists: {os.path.exists(db_dir)}")
+                logger.info(f"Database file exists: {os.path.exists(db_file_path)}")
+                
+                if os.path.exists(db_file_path):
+                    file_size = os.path.getsize(db_file_path)
+                    file_mtime = os.path.getmtime(db_file_path)
+                    logger.info(f"Database file size: {file_size} bytes")
+                    logger.info(f"Database file modified: {file_mtime}")
+                    
+                    # Check if database has existing data
+                    try:
+                        from sqlalchemy import text
+                        with self.engine.connect() as conn:
+                            result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+                            tables = [row[0] for row in result]
+                            logger.info(f"Existing tables in database: {tables}")
+                            
+                            # Check for existing data
+                            if 'caldav_accounts' in tables:
+                                result = conn.execute(text("SELECT COUNT(*) FROM caldav_accounts"))
+                                count = result.scalar()
+                                logger.info(f"Existing CalDAV accounts: {count}")
+                            
+                            if 'google_oauth_tokens' in tables:
+                                result = conn.execute(text("SELECT COUNT(*) FROM google_oauth_tokens"))
+                                count = result.scalar()
+                                logger.info(f"Existing Google OAuth tokens: {count}")
+                            
+                            if 'calendar_mappings' in tables:
+                                result = conn.execute(text("SELECT COUNT(*) FROM calendar_mappings"))
+                                count = result.scalar()
+                                logger.info(f"Existing calendar mappings: {count}")
+                                
+                    except Exception as e:
+                        logger.warning(f"Could not check existing data: {e}")
+                else:
+                    logger.info("Database file does not exist - will create new database")
+            
             logger.info(f"Creating database tables with URL: {self.database_url}")
             Base.metadata.create_all(bind=self.engine)
             logger.info("Database tables created successfully")
+            
         except Exception as e:
             from app.utils.logging import get_logger
             logger = get_logger("database")
