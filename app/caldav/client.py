@@ -85,26 +85,35 @@ class CalDAVClient:
     def discover_calendars(self) -> List[CalDAVCalendar]:
         """Discover available calendars for this account."""
         try:
+            self.logger.info("=== CALENDAR DISCOVERY DEBUG ===")
             principal = self.client.principal()
             calendars = principal.calendars()
             
+            self.logger.info(f"Found {len(calendars)} calendars from principal")
+            
             discovered_calendars = []
             
-            for cal in calendars:
+            for i, cal in enumerate(calendars):
                 try:
-                    # Get calendar properties
+                    self.logger.info(f"Processing calendar {i+1}: {cal.url}")
+                    
+                    # Get basic calendar properties - avoid CalendarDescription which doesn't exist
                     props = cal.get_properties([
                         caldav.dav.DisplayName(),
-                        caldav.dav.CalendarDescription(),
                         caldav.dav.CalendarColor(),
                         caldav.dav.CalendarTimeZone(),
                     ])
                     
+                    self.logger.info(f"Retrieved properties for calendar {cal.url}: {list(props.keys())}")
+                    
                     calendar_id = cal.url.path.rstrip('/')
                     name = str(props.get(caldav.dav.DisplayName.tag, calendar_id))
-                    description = str(props.get(caldav.dav.CalendarDescription.tag, '')) or None
+                    # Skip description since CalendarDescription doesn't exist
+                    description = None
                     color = str(props.get(caldav.dav.CalendarColor.tag, '')) or None
                     timezone = str(props.get(caldav.dav.CalendarTimeZone.tag, '')) or None
+                    
+                    self.logger.info(f"Calendar details - ID: {calendar_id}, Name: {name}, Color: {color}, Timezone: {timezone}")
                     
                     caldav_calendar = CalDAVCalendar(
                         id=calendar_id,
@@ -116,15 +125,36 @@ class CalDAVClient:
                     )
                     
                     discovered_calendars.append(caldav_calendar)
+                    self.logger.info(f"Successfully added calendar: {name}")
                     
                 except Exception as e:
                     self.logger.warning(f"Failed to get properties for calendar {cal.url}: {e}")
-                    continue
+                    # Try to add calendar with minimal info
+                    try:
+                        calendar_id = cal.url.path.rstrip('/')
+                        name = calendar_id.split('/')[-1] or "Unknown Calendar"
+                        
+                        caldav_calendar = CalDAVCalendar(
+                            id=calendar_id,
+                            name=name,
+                            description=None,
+                            color=None,
+                            timezone=None,
+                            url=str(cal.url)
+                        )
+                        
+                        discovered_calendars.append(caldav_calendar)
+                        self.logger.info(f"Added calendar with minimal info: {name}")
+                    except Exception as e2:
+                        self.logger.error(f"Failed to add calendar even with minimal info: {e2}")
+                        continue
             
+            self.logger.info(f"=== DISCOVERY COMPLETE: {len(discovered_calendars)} calendars discovered ===")
             self.logger.log_calendar_discovery(len(discovered_calendars))
             return discovered_calendars
             
         except Exception as e:
+            self.logger.error(f"Calendar discovery failed completely: {e}")
             raise handle_caldav_exception(e)
     
     def get_calendar_by_id(self, calendar_id: str) -> Optional[caldav.Calendar]:
