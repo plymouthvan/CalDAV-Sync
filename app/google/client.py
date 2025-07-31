@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 import asyncio
+import pytz
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -201,6 +202,12 @@ class GoogleCalendarClient:
         """Fetch events from a calendar using the sync window configuration."""
         start_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date + timedelta(days=sync_window_days)
+        
+        # Ensure timezone awareness
+        if start_date.tzinfo is None:
+            start_date = pytz.UTC.localize(start_date)
+        if end_date.tzinfo is None:
+            end_date = pytz.UTC.localize(end_date)
         
         self.logger.info(f"GOOGLE DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
         

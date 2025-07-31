@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 from urllib.parse import urljoin
 import requests
 from requests.auth import HTTPBasicAuth
+import pytz
 
 from app.caldav.models import CalDAVEvent, CalDAVCalendar, CalDAVAccount
 from app.config import get_settings
@@ -234,6 +235,12 @@ class CalDAVClient:
         """Fetch events from a calendar using the sync window configuration."""
         start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date + timedelta(days=sync_window_days)
+        
+        # Ensure timezone awareness
+        if start_date.tzinfo is None:
+            start_date = pytz.UTC.localize(start_date)
+        if end_date.tzinfo is None:
+            end_date = pytz.UTC.localize(end_date)
         
         self.logger.info(f"CALDAV DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
         
