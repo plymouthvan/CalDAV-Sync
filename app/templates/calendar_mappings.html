@@ -236,6 +236,18 @@ async function loadCalDAVAccounts() {
         const select = document.getElementById('caldavAccount');
         select.innerHTML = '<option value="">Select an account...</option>';
         
+        if (!response.ok) {
+            console.error('Error loading CalDAV accounts:', accounts);
+            select.innerHTML = '<option value="">Error loading accounts</option>';
+            return;
+        }
+        
+        if (!Array.isArray(accounts)) {
+            console.error('Expected accounts array, got:', accounts);
+            select.innerHTML = '<option value="">Error: Invalid response format</option>';
+            return;
+        }
+        
         accounts.forEach(account => {
             if (account.enabled) {
                 const option = document.createElement('option');
@@ -264,9 +276,24 @@ async function loadCalDAVCalendars(accountId) {
         select.disabled = true;
         
         const response = await fetch(`/api/caldav/accounts/${accountId}/calendars`);
-        const calendars = await response.json();
+        const result = await response.json();
         
         select.innerHTML = '<option value="">Select a calendar...</option>';
+        
+        if (!response.ok) {
+            console.error('Error response from calendars API:', result);
+            select.innerHTML = '<option value="">Error loading calendars</option>';
+            return;
+        }
+        
+        // Check if result has calendars array (from CalendarDiscoveryResponse)
+        const calendars = result.calendars || result;
+        
+        if (!Array.isArray(calendars)) {
+            console.error('Expected calendars array, got:', calendars);
+            select.innerHTML = '<option value="">Error: Invalid response format</option>';
+            return;
+        }
         
         calendars.forEach(calendar => {
             const option = document.createElement('option');
@@ -287,10 +314,25 @@ async function loadCalDAVCalendars(accountId) {
 async function loadGoogleCalendars() {
     try {
         const response = await fetch('/api/google/calendars');
-        const calendars = await response.json();
+        const result = await response.json();
         
         const select = document.getElementById('googleCalendar');
         select.innerHTML = '<option value="">Select a calendar...</option>';
+        
+        if (!response.ok) {
+            console.error('Error loading Google calendars:', result);
+            select.innerHTML = '<option value="">Google authentication required</option>';
+            return;
+        }
+        
+        // Handle different possible response formats
+        const calendars = result.calendars || result.items || result;
+        
+        if (!Array.isArray(calendars)) {
+            console.error('Expected calendars array, got:', calendars);
+            select.innerHTML = '<option value="">Error: Invalid response format</option>';
+            return;
+        }
         
         calendars.forEach(calendar => {
             const option = document.createElement('option');
@@ -425,8 +467,15 @@ function showAlert(message, type) {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
-    container.insertAdjacentHTML('afterbegin', alertHtml);
+    const container = document.querySelector('main.container');
+    if (container) {
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+    } else {
+        console.error('Could not find main container element');
+        // Fallback: try to show alert in modal or use browser alert
+        alert(message);
+        return;
+    }
     
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
