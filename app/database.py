@@ -221,6 +221,7 @@ class DatabaseManager:
         try:
             from app.utils.logging import get_logger
             import os
+            import stat
             logger = get_logger("database")
             
             # Extract database file path for SQLite
@@ -238,6 +239,33 @@ class DatabaseManager:
                 db_dir = os.path.dirname(db_file_path)
                 logger.info(f"Database directory: {db_dir}")
                 logger.info(f"Database directory exists: {os.path.exists(db_dir)}")
+                
+                # Check directory permissions and ownership
+                if os.path.exists(db_dir):
+                    dir_stat = os.stat(db_dir)
+                    logger.info(f"Directory owner UID: {dir_stat.st_uid}")
+                    logger.info(f"Directory owner GID: {dir_stat.st_gid}")
+                    logger.info(f"Directory permissions: {oct(dir_stat.st_mode)[-3:]}")
+                    logger.info(f"Current process UID: {os.getuid()}")
+                    logger.info(f"Current process GID: {os.getgid()}")
+                    
+                    # Check if we can write to the directory
+                    try:
+                        test_file = os.path.join(db_dir, "test_write.tmp")
+                        with open(test_file, 'w') as f:
+                            f.write("test")
+                        os.remove(test_file)
+                        logger.info("Directory write test: SUCCESS")
+                    except Exception as e:
+                        logger.error(f"Directory write test: FAILED - {e}")
+                        
+                        # Try to fix permissions if possible
+                        try:
+                            os.chmod(db_dir, 0o777)
+                            logger.info("Changed directory permissions to 777")
+                        except Exception as chmod_e:
+                            logger.error(f"Could not change directory permissions: {chmod_e}")
+                
                 logger.info(f"Database file exists: {os.path.exists(db_file_path)}")
                 
                 if os.path.exists(db_file_path):

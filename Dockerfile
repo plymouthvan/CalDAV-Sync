@@ -28,8 +28,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY app/ ./app/
 COPY .env.example .env
 
-# Create data directory for SQLite database
-RUN mkdir -p /app/data && chown -R appuser:appuser /app
+# Create data directory for SQLite database with proper permissions
+RUN mkdir -p /app/data && chmod 777 /app/data && chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
