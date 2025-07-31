@@ -522,12 +522,25 @@ function updateSyncStats(data) {
 function updateRecentActivity(activities) {
     const activityContainer = document.getElementById('recent-activity');
     
-    if (activities.length === 0) {
-        activityContainer.innerHTML = '<p class="text-muted text-center">No recent sync activity</p>';
+    // Filter activities to only show those with actual changes
+    const meaningfulActivities = activities.filter(activity => {
+        const totalChanges = (activity.inserted_count || 0) + (activity.updated_count || 0) + (activity.deleted_count || 0);
+        return totalChanges > 0 || activity.status === 'failure' || activity.status === 'partial_failure';
+    });
+    
+    if (meaningfulActivities.length === 0) {
+        activityContainer.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-info-circle"></i>
+                <p class="mb-1">No recent sync changes</p>
+                <small>Only sync operations with actual changes are shown here.<br>
+                Empty polling operations are filtered out for clarity.</small>
+            </div>
+        `;
         return;
     }
     
-    const activityHtml = activities.map(activity => {
+    const activityHtml = meaningfulActivities.map(activity => {
         // Fix status badge logic - only show "running" for actually running syncs
         let statusBadge, statusIcon, statusText;
         
