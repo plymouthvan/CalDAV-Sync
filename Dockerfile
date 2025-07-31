@@ -21,31 +21,12 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
 # Copy application code
 COPY app/ ./app/
 COPY .env.example .env
 
-# Create data directory for SQLite database with proper permissions
-RUN mkdir -p /app/data && chmod 777 /app/data && chown -R appuser:appuser /app
-
-# Create entrypoint script to fix permissions at runtime
-RUN echo '#!/bin/bash\n\
-# Fix data directory permissions if needed\n\
-if [ -d "/app/data" ]; then\n\
-    chown -R appuser:appuser /app/data\n\
-    chmod 755 /app/data\n\
-fi\n\
-# Switch to appuser and run the application\n\
-exec su-exec appuser "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
-
-# Install su-exec for user switching
-RUN apt-get update && apt-get install -y su-exec && rm -rf /var/lib/apt/lists/*
-
-# Use entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
+# Create data directory for SQLite database
+RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE 8000
