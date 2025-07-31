@@ -21,7 +21,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h5 class="card-title">System Status</h5>
+                        <h5 class="card-title" data-bs-toggle="tooltip"
+                            title="Overall health status of the CalDAV sync service">
+                            System Status
+                        </h5>
                         <h3 id="system-status">Loading...</h3>
                     </div>
                     <div class="align-self-center">
@@ -37,7 +40,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h5 class="card-title">Active Mappings</h5>
+                        <h5 class="card-title" data-bs-toggle="tooltip"
+                            title="Number of calendar mappings currently enabled for synchronization">
+                            Active Mappings
+                        </h5>
                         <h3 id="active-mappings">0</h3>
                     </div>
                     <div class="align-self-center">
@@ -53,7 +59,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h5 class="card-title">Running Syncs</h5>
+                        <h5 class="card-title" data-bs-toggle="tooltip"
+                            title="Number of sync operations currently in progress">
+                            Running Syncs
+                        </h5>
                         <h3 id="running-syncs">0</h3>
                     </div>
                     <div class="align-self-center">
@@ -69,7 +78,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h5 class="card-title">Google Auth</h5>
+                        <h5 class="card-title" data-bs-toggle="tooltip"
+                            title="Google Calendar API authentication status">
+                            Google Auth
+                        </h5>
                         <h3 id="google-auth-status">Unknown</h3>
                     </div>
                     <div class="align-self-center">
@@ -121,7 +133,10 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="bi bi-clock-history"></i> Recent Sync Activity</h5>
+                <h5 data-bs-toggle="tooltip"
+                    title="Latest sync operations with their status and event counts">
+                    <i class="bi bi-clock-history"></i> Recent Sync Activity
+                </h5>
                 <a href="{{ url_for('sync_history') }}" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
             <div class="card-body">
@@ -139,7 +154,10 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-header">
-                <h5><i class="bi bi-bar-chart"></i> Sync Statistics (24h)</h5>
+                <h5 data-bs-toggle="tooltip"
+                    title="Summary of sync operations and event processing over the last 24 hours">
+                    <i class="bi bi-bar-chart"></i> Sync Statistics (24h)
+                </h5>
             </div>
             <div class="card-body">
                 <div id="sync-stats">
@@ -159,7 +177,10 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="bi bi-list"></i> Calendar Mappings</h5>
+                <h5 data-bs-toggle="tooltip"
+                    title="Overview of configured calendar synchronization mappings">
+                    <i class="bi bi-list"></i> Calendar Mappings
+                </h5>
                 <a href="{{ url_for('calendar_mappings') }}" class="btn btn-sm btn-outline-primary">Manage All</a>
             </div>
             <div class="card-body">
@@ -189,33 +210,74 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadDashboardData() {
     try {
         // Load system status
-        const statusResponse = await fetch('/api/status');
-        const statusData = await statusResponse.json();
-        updateSystemStatus(statusData);
+        try {
+            const statusResponse = await fetch('/api/status');
+            if (!statusResponse.ok) throw new Error(`Status API error: ${statusResponse.status}`);
+            const statusData = await statusResponse.json();
+            updateSystemStatus(statusData);
+        } catch (error) {
+            console.error('Error loading system status:', error);
+            showAlert('Failed to load system status', 'warning');
+        }
         
         // Load sync statistics
-        const statsResponse = await fetch('/api/sync/stats?days=1');
-        const statsData = await statsResponse.json();
-        updateSyncStats(statsData);
+        try {
+            const statsResponse = await fetch('/api/sync/stats?days=1');
+            if (!statsResponse.ok) throw new Error(`Stats API error: ${statsResponse.status}`);
+            const statsData = await statsResponse.json();
+            updateSyncStats(statsData);
+        } catch (error) {
+            console.error('Error loading sync statistics:', error);
+            updateSyncStats(null); // This will show the error state
+        }
         
         // Load recent activity
-        const activityResponse = await fetch('/api/sync/history?limit=5');
-        const activityData = await activityResponse.json();
-        updateRecentActivity(activityData.results);
+        try {
+            const activityResponse = await fetch('/api/sync/history?limit=5');
+            if (!activityResponse.ok) throw new Error(`History API error: ${activityResponse.status}`);
+            const activityData = await activityResponse.json();
+            updateRecentActivity(activityData.results || []);
+        } catch (error) {
+            console.error('Error loading recent activity:', error);
+            document.getElementById('recent-activity').innerHTML = `
+                <div class="text-center text-muted">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p class="mb-0">Unable to load recent activity</p>
+                </div>
+            `;
+        }
         
         // Load mappings overview
-        const mappingsResponse = await fetch('/api/mappings');
-        const mappingsData = await mappingsResponse.json();
-        updateMappingsOverview(mappingsData);
+        try {
+            const mappingsResponse = await fetch('/api/mappings');
+            if (!mappingsResponse.ok) throw new Error(`Mappings API error: ${mappingsResponse.status}`);
+            const mappingsData = await mappingsResponse.json();
+            updateMappingsOverview(mappingsData);
+        } catch (error) {
+            console.error('Error loading mappings:', error);
+            document.getElementById('mappings-overview').innerHTML = `
+                <div class="text-center text-muted">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <p class="mb-0">Unable to load calendar mappings</p>
+                </div>
+            `;
+        }
         
         // Load scheduler status
-        const schedulerResponse = await fetch('/api/sync/scheduler');
-        const schedulerData = await schedulerResponse.json();
-        updateSchedulerStatus(schedulerData);
+        try {
+            const schedulerResponse = await fetch('/api/sync/scheduler');
+            if (!schedulerResponse.ok) throw new Error(`Scheduler API error: ${schedulerResponse.status}`);
+            const schedulerData = await schedulerResponse.json();
+            updateSchedulerStatus(schedulerData);
+        } catch (error) {
+            console.error('Error loading scheduler status:', error);
+            document.getElementById('running-syncs').textContent = '?';
+            document.getElementById('running-syncs').setAttribute('title', 'Unable to load scheduler status');
+        }
         
     } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        showAlert('Error loading dashboard data', 'error');
+        console.error('Critical error loading dashboard data:', error);
+        showAlert('Critical error loading dashboard data. Please refresh the page.', 'danger');
     }
 }
 
@@ -304,46 +366,157 @@ function showSetupAlert() {
 
 function updateSchedulerStatus(data) {
     const runningElement = document.getElementById('running-syncs');
-    runningElement.textContent = data.scheduler.active_syncs || 0;
+    const runningCard = runningElement.closest('.card');
+    
+    const activeSyncs = data.scheduler.active_syncs || 0;
+    const totalJobs = data.scheduler.total_jobs || 0;
+    
+    // Update the number
+    runningElement.textContent = activeSyncs;
+    
+    // Update card color based on activity
+    const cardClasses = runningCard.className.split(' ').filter(cls => !cls.startsWith('bg-'));
+    if (activeSyncs > 0) {
+        runningCard.className = cardClasses.join(' ') + ' bg-primary';
+    } else {
+        runningCard.className = cardClasses.join(' ') + ' bg-warning';
+    }
+    
+    // Add tooltip with more information
+    runningElement.setAttribute('data-bs-toggle', 'tooltip');
+    runningElement.setAttribute('title',
+        `${activeSyncs} active syncs, ${totalJobs} total scheduled jobs`
+    );
+    
+    // Initialize tooltip
+    new bootstrap.Tooltip(runningElement);
 }
 
 function updateSyncStats(data) {
     const statsContainer = document.getElementById('sync-stats');
     
+    // Check if data is valid
+    if (!data || !data.overview || !data.events) {
+        statsContainer.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-exclamation-triangle"></i>
+                <p class="mb-0">Unable to load sync statistics</p>
+                <small>Check API connectivity</small>
+            </div>
+        `;
+        return;
+    }
+    
+    const totalSyncs = data.overview.total_syncs || 0;
+    const successfulSyncs = data.overview.successful_syncs || 0;
+    const failedSyncs = data.overview.failed_syncs || 0;
+    const successRate = data.overview.success_rate || 0;
+    const avgDuration = data.overview.average_duration_seconds || 0;
+    
+    const totalInserted = data.events.total_inserted || 0;
+    const totalUpdated = data.events.total_updated || 0;
+    const totalDeleted = data.events.total_deleted || 0;
+    const totalEvents = totalInserted + totalUpdated + totalDeleted;
+    
     statsContainer.innerHTML = `
-        <div class="row text-center">
+        <div class="row text-center mb-3">
             <div class="col-6">
-                <h4 class="text-success">${data.overview.successful_syncs}</h4>
-                <small class="text-muted">Successful</small>
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                    <div>
+                        <h4 class="text-success mb-0" data-bs-toggle="tooltip"
+                            title="Successful syncs in the last 24 hours">${successfulSyncs}</h4>
+                        <small class="text-muted">Successful</small>
+                    </div>
+                </div>
             </div>
             <div class="col-6">
-                <h4 class="text-danger">${data.overview.failed_syncs}</h4>
-                <small class="text-muted">Failed</small>
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-x-circle-fill text-danger me-2"></i>
+                    <div>
+                        <h4 class="text-danger mb-0" data-bs-toggle="tooltip"
+                            title="Failed syncs in the last 24 hours">${failedSyncs}</h4>
+                        <small class="text-muted">Failed</small>
+                    </div>
+                </div>
             </div>
         </div>
-        <hr>
-        <div class="row text-center">
-            <div class="col-4">
-                <h5 class="text-primary">${data.events.total_inserted}</h5>
-                <small class="text-muted">Inserted</small>
-            </div>
-            <div class="col-4">
-                <h5 class="text-warning">${data.events.total_updated}</h5>
-                <small class="text-muted">Updated</small>
-            </div>
-            <div class="col-4">
-                <h5 class="text-info">${data.events.total_deleted}</h5>
-                <small class="text-muted">Deleted</small>
+        
+        <div class="row text-center mb-3">
+            <div class="col-12">
+                <div class="progress mb-2" style="height: 8px;" data-bs-toggle="tooltip"
+                     title="Success rate: ${successRate.toFixed(1)}%">
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: ${successRate}%" aria-valuenow="${successRate}"
+                         aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <small class="text-muted">
+                    <strong>${successRate.toFixed(1)}%</strong> success rate
+                    (${totalSyncs} total syncs)
+                </small>
             </div>
         </div>
-        <hr>
+        
+        <hr class="my-3">
+        
+        <div class="row text-center mb-3">
+            <div class="col-4">
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-plus-circle text-primary me-1"></i>
+                    <div>
+                        <h5 class="text-primary mb-0" data-bs-toggle="tooltip"
+                            title="Events added to calendars">${totalInserted}</h5>
+                        <small class="text-muted">Added</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-pencil-circle text-warning me-1"></i>
+                    <div>
+                        <h5 class="text-warning mb-0" data-bs-toggle="tooltip"
+                            title="Events modified in calendars">${totalUpdated}</h5>
+                        <small class="text-muted">Updated</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-trash-circle text-info me-1"></i>
+                    <div>
+                        <h5 class="text-info mb-0" data-bs-toggle="tooltip"
+                            title="Events removed from calendars">${totalDeleted}</h5>
+                        <small class="text-muted">Removed</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <hr class="my-3">
+        
         <div class="text-center">
-            <small class="text-muted">
-                Success Rate: ${data.overview.success_rate.toFixed(1)}%<br>
-                Avg Duration: ${data.overview.average_duration_seconds.toFixed(1)}s
-            </small>
+            <div class="row">
+                <div class="col-6">
+                    <small class="text-muted">
+                        <i class="bi bi-calendar-event"></i>
+                        <strong>${totalEvents}</strong> events processed
+                    </small>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted">
+                        <i class="bi bi-stopwatch"></i>
+                        <strong>${avgDuration.toFixed(1)}s</strong> avg duration
+                    </small>
+                </div>
+            </div>
         </div>
     `;
+    
+    // Initialize tooltips for the new elements
+    const tooltipTriggerList = statsContainer.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach(tooltipTriggerEl => {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 }
 
 function updateRecentActivity(activities) {
@@ -355,33 +528,100 @@ function updateRecentActivity(activities) {
     }
     
     const activityHtml = activities.map(activity => {
-        const statusBadge = activity.status === 'success' ? 'success' : 
-                           activity.status === 'failure' ? 'danger' : 'warning';
-        const statusIcon = activity.status === 'success' ? 'check-circle' : 
-                          activity.status === 'failure' ? 'x-circle' : 'exclamation-triangle';
+        // Fix status badge logic - only show "running" for actually running syncs
+        let statusBadge, statusIcon, statusText;
+        
+        if (activity.status === 'success') {
+            statusBadge = 'success';
+            statusIcon = 'check-circle-fill';
+            statusText = 'Completed';
+        } else if (activity.status === 'failure') {
+            statusBadge = 'danger';
+            statusIcon = 'x-circle-fill';
+            statusText = 'Failed';
+        } else if (activity.status === 'partial_failure') {
+            statusBadge = 'warning';
+            statusIcon = 'exclamation-triangle-fill';
+            statusText = 'Partial';
+        } else if (activity.status === 'running') {
+            statusBadge = 'primary';
+            statusIcon = 'arrow-repeat';
+            statusText = 'Running';
+        } else {
+            statusBadge = 'secondary';
+            statusIcon = 'question-circle';
+            statusText = activity.status || 'Unknown';
+        }
+        
+        // Format sync direction more clearly
+        const directionText = activity.direction === 'caldav_to_google' ? 'CalDAV → Google' :
+                             activity.direction === 'google_to_caldav' ? 'Google → CalDAV' :
+                             activity.direction === 'bidirectional' ? 'Bidirectional' :
+                             activity.direction;
+        
+        // Calculate total events processed
+        const totalEvents = (activity.inserted_count || 0) + (activity.updated_count || 0) + (activity.deleted_count || 0);
         
         return `
             <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                <div>
-                    <span class="badge bg-${statusBadge}">
-                        <i class="bi bi-${statusIcon}"></i> ${activity.status}
-                    </span>
-                    <small class="text-muted ms-2">${activity.direction}</small>
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-1">
+                        <span class="badge bg-${statusBadge} me-2" data-bs-toggle="tooltip"
+                              title="Sync ${statusText.toLowerCase()}">
+                            <i class="bi bi-${statusIcon}"></i> ${statusText}
+                        </span>
+                        <small class="text-muted">${directionText}</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <small class="text-muted me-3">
+                            <i class="bi bi-clock"></i> ${new Date(activity.started_at).toLocaleString()}
+                        </small>
+                        ${activity.duration_seconds ?
+                            `<small class="text-muted">
+                                <i class="bi bi-stopwatch"></i> ${activity.duration_seconds.toFixed(1)}s
+                            </small>` : ''
+                        }
+                    </div>
                 </div>
                 <div class="text-end">
-                    <small class="text-muted">
-                        ${new Date(activity.started_at).toLocaleString()}
-                    </small>
-                    <br>
-                    <small class="text-success">${activity.inserted_count}I</small>
-                    <small class="text-warning">${activity.updated_count}U</small>
-                    <small class="text-info">${activity.deleted_count}D</small>
+                    <div class="mb-1">
+                        <span class="badge bg-light text-dark" data-bs-toggle="tooltip"
+                              title="Total events processed: ${totalEvents}">
+                            ${totalEvents} events
+                        </span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        ${activity.inserted_count > 0 ?
+                            `<small class="text-success" data-bs-toggle="tooltip" title="Events inserted">
+                                <i class="bi bi-plus-circle"></i> ${activity.inserted_count}
+                            </small>` : ''
+                        }
+                        ${activity.updated_count > 0 ?
+                            `<small class="text-warning" data-bs-toggle="tooltip" title="Events updated">
+                                <i class="bi bi-pencil-circle"></i> ${activity.updated_count}
+                            </small>` : ''
+                        }
+                        ${activity.deleted_count > 0 ?
+                            `<small class="text-info" data-bs-toggle="tooltip" title="Events deleted">
+                                <i class="bi bi-trash-circle"></i> ${activity.deleted_count}
+                            </small>` : ''
+                        }
+                        ${totalEvents === 0 ?
+                            `<small class="text-muted">No changes</small>` : ''
+                        }
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
     
     activityContainer.innerHTML = activityHtml;
+    
+    // Initialize tooltips for the new elements
+    const tooltipTriggerList = activityContainer.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach(tooltipTriggerEl => {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 }
 
 function updateMappingsOverview(mappings) {
