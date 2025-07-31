@@ -292,9 +292,13 @@ class EventDiffer:
         self.logger.info(f"  last_caldav_sync: {last_caldav_sync} (type: {type(last_caldav_sync)}, tzinfo: {getattr(last_caldav_sync, 'tzinfo', None)})")
         self.logger.info(f"  last_google_sync: {last_google_sync} (type: {type(last_google_sync)}, tzinfo: {getattr(last_google_sync, 'tzinfo', None)})")
         
+        # Add change detection debugging
+        self.logger.info(f"CHANGE DETECTION DEBUG for UID {caldav_event.uid}:")
+        
         try:
             caldav_has_changes = (not last_caldav_sync or
                                  (caldav_modified and caldav_modified > last_caldav_sync))
+            self.logger.info(f"  caldav_has_changes: {caldav_has_changes} (no last_sync: {not last_caldav_sync}, modified_newer: {caldav_modified and caldav_modified > last_caldav_sync if last_caldav_sync else 'N/A'})")
         except TypeError as e:
             self.logger.error(f"DATETIME COMPARISON ERROR (CalDAV): {e}")
             self.logger.error(f"  Comparing: {caldav_modified} > {last_caldav_sync}")
@@ -303,6 +307,7 @@ class EventDiffer:
         try:
             google_has_changes = (not last_google_sync or
                                  (google_modified and google_modified > last_google_sync))
+            self.logger.info(f"  google_has_changes: {google_has_changes} (no last_sync: {not last_google_sync}, modified_newer: {google_modified and google_modified > last_google_sync if last_google_sync else 'N/A'})")
         except TypeError as e:
             self.logger.error(f"DATETIME COMPARISON ERROR (Google): {e}")
             self.logger.error(f"  Comparing: {google_modified} > {last_google_sync}")
@@ -322,6 +327,7 @@ class EventDiffer:
         
         # No changes detected
         if not caldav_has_changes and not google_has_changes:
+            self.logger.info(f"  DECISION: NO_CHANGE - No changes detected")
             return EventChange(
                 action=ChangeAction.NO_CHANGE,
                 event_uid=caldav_event.uid,
@@ -333,6 +339,7 @@ class EventDiffer:
         
         # Only one side has changes
         if caldav_has_changes and not google_has_changes:
+            self.logger.info(f"  DECISION: UPDATE - CalDAV event updated")
             return EventChange(
                 action=ChangeAction.UPDATE,
                 event_uid=caldav_event.uid,
@@ -343,6 +350,7 @@ class EventDiffer:
             )
         
         if google_has_changes and not caldav_has_changes:
+            self.logger.info(f"  DECISION: UPDATE - Google event updated")
             return EventChange(
                 action=ChangeAction.UPDATE,
                 event_uid=caldav_event.uid,
@@ -353,6 +361,7 @@ class EventDiffer:
             )
         
         # Both sides have changes - conflict resolution needed
+        self.logger.info(f"  DECISION: CONFLICT - Both events modified")
         resolution = self._resolve_conflict(caldav_event, google_event, mapping)
         
         return EventChange(
