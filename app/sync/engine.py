@@ -69,11 +69,14 @@ class SyncEngine:
         """
         logger = SyncLogger(mapping.id, mapping.sync_direction)
         
+        start_time = datetime.utcnow()
+        logger.info(f"SYNC ENGINE DATETIME DEBUG: started_at={start_time} (tzinfo: {start_time.tzinfo})")
+        
         result = SyncResult(
             mapping_id=mapping.id,
             direction=mapping.sync_direction,
             status="failure",
-            started_at=datetime.utcnow()
+            started_at=start_time
         )
         
         # Create sync log record
@@ -111,6 +114,7 @@ class SyncEngine:
                 result.status = "failure"
             
             result.completed_at = datetime.utcnow()
+            logger.info(f"SYNC ENGINE DATETIME DEBUG: completed_at={result.completed_at} (tzinfo: {result.completed_at.tzinfo})")
             result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
             
             logger.log_sync_complete(
@@ -477,7 +481,9 @@ class SyncEngine:
                 existing.last_google_updated = google_updated
                 existing.sync_direction_last = sync_direction
                 existing.event_hash = event_hash
-                existing.updated_at = datetime.utcnow()
+                update_time = datetime.utcnow()
+                logger.info(f"EVENT MAPPING DATETIME DEBUG: updated_at={update_time} (tzinfo: {update_time.tzinfo})")
+                existing.updated_at = update_time
             else:
                 # Create new mapping
                 new_mapping = EventMapping(

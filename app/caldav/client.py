@@ -235,7 +235,18 @@ class CalDAVClient:
         start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date + timedelta(days=sync_window_days)
         
-        return self.get_events(calendar_id, start_date, end_date)
+        self.logger.info(f"CALDAV DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
+        
+        events = self.get_events(calendar_id, start_date, end_date)
+        
+        # Log datetime info for fetched events
+        for event in events:
+            self.logger.info(f"CALDAV EVENT DATETIME DEBUG for UID {event.uid}:")
+            self.logger.info(f"  start: {event.start} (type: {type(event.start)}, tzinfo: {getattr(event.start, 'tzinfo', None)})")
+            self.logger.info(f"  end: {event.end} (type: {type(event.end)}, tzinfo: {getattr(event.end, 'tzinfo', None)})")
+            self.logger.info(f"  last_modified: {event.last_modified} (type: {type(event.last_modified)}, tzinfo: {getattr(event.last_modified, 'tzinfo', None)})")
+        
+        return events
     
     def create_event(self, calendar_id: str, event: CalDAVEvent) -> bool:
         """Create a new event in the specified calendar."""

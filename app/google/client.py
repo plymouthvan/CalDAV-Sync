@@ -202,7 +202,19 @@ class GoogleCalendarClient:
         start_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date + timedelta(days=sync_window_days)
         
-        return self.get_events(calendar_id, start_date, end_date)
+        self.logger.info(f"GOOGLE DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
+        
+        events = self.get_events(calendar_id, start_date, end_date)
+        
+        # Log datetime info for fetched events
+        for event in events:
+            self.logger.info(f"GOOGLE EVENT DATETIME DEBUG for UID {event.uid} (ID: {event.id}):")
+            self.logger.info(f"  start: {event.start} (type: {type(event.start)}, tzinfo: {getattr(event.start, 'tzinfo', None)})")
+            self.logger.info(f"  end: {event.end} (type: {type(event.end)}, tzinfo: {getattr(event.end, 'tzinfo', None)})")
+            self.logger.info(f"  updated: {event.updated} (type: {type(event.updated)}, tzinfo: {getattr(event.updated, 'tzinfo', None)})")
+            self.logger.info(f"  created: {event.created} (type: {type(event.created)}, tzinfo: {getattr(event.created, 'tzinfo', None)})")
+        
+        return events
     
     def create_event(self, calendar_id: str, event: GoogleCalendarEvent) -> GoogleCalendarEvent:
         """Create a new event in the specified calendar."""

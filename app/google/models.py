@@ -234,10 +234,13 @@ class GoogleCalendarEvent:
             updated = None
             if api_data.get("updated"):
                 updated = date_parser.parse(api_data["updated"])
+                # Add diagnostic logging for datetime parsing
+                print(f"GOOGLE MODEL DEBUG: updated={updated} (type: {type(updated)}, tzinfo: {getattr(updated, 'tzinfo', None)})")
             
             created = None
             if api_data.get("created"):
                 created = date_parser.parse(api_data["created"])
+                print(f"GOOGLE MODEL DEBUG: created={created} (type: {type(created)}, tzinfo: {getattr(created, 'tzinfo', None)})")
             
             return cls(
                 id=event_id,

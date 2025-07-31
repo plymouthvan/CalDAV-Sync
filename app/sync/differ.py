@@ -272,10 +272,28 @@ class EventDiffer:
         last_google_sync = mapping.last_google_updated if mapping else None
         
         # Determine if each side has changes
-        caldav_has_changes = (not last_caldav_sync or 
-                             (caldav_modified and caldav_modified > last_caldav_sync))
-        google_has_changes = (not last_google_sync or 
-                             (google_modified and google_modified > last_google_sync))
+        # Add diagnostic logging for datetime comparison issue
+        self.logger.info(f"DATETIME DEBUG for UID {caldav_event.uid}:")
+        self.logger.info(f"  caldav_modified: {caldav_modified} (type: {type(caldav_modified)}, tzinfo: {getattr(caldav_modified, 'tzinfo', None)})")
+        self.logger.info(f"  google_modified: {google_modified} (type: {type(google_modified)}, tzinfo: {getattr(google_modified, 'tzinfo', None)})")
+        self.logger.info(f"  last_caldav_sync: {last_caldav_sync} (type: {type(last_caldav_sync)}, tzinfo: {getattr(last_caldav_sync, 'tzinfo', None)})")
+        self.logger.info(f"  last_google_sync: {last_google_sync} (type: {type(last_google_sync)}, tzinfo: {getattr(last_google_sync, 'tzinfo', None)})")
+        
+        try:
+            caldav_has_changes = (not last_caldav_sync or
+                                 (caldav_modified and caldav_modified > last_caldav_sync))
+        except TypeError as e:
+            self.logger.error(f"DATETIME COMPARISON ERROR (CalDAV): {e}")
+            self.logger.error(f"  Comparing: {caldav_modified} > {last_caldav_sync}")
+            raise
+            
+        try:
+            google_has_changes = (not last_google_sync or
+                                 (google_modified and google_modified > last_google_sync))
+        except TypeError as e:
+            self.logger.error(f"DATETIME COMPARISON ERROR (Google): {e}")
+            self.logger.error(f"  Comparing: {google_modified} > {last_google_sync}")
+            raise
         
         # Check content changes as fallback
         if not caldav_has_changes and not google_has_changes:
@@ -346,19 +364,30 @@ class EventDiffer:
         caldav_modified = caldav_event.last_modified
         google_modified = google_event.updated
         
+        # Add diagnostic logging for datetime comparison issue
+        self.logger.info(f"CONFLICT RESOLUTION DEBUG for UID {caldav_event.uid}:")
+        self.logger.info(f"  caldav_modified: {caldav_modified} (type: {type(caldav_modified)}, tzinfo: {getattr(caldav_modified, 'tzinfo', None)})")
+        self.logger.info(f"  google_modified: {google_modified} (type: {type(google_modified)}, tzinfo: {getattr(google_modified, 'tzinfo', None)})")
+        
         # Log conflict for debugging
         reason = ""
         
         if caldav_modified and google_modified:
-            if caldav_modified > google_modified:
-                reason = f"CalDAV more recent ({caldav_modified} > {google_modified})"
-                resolution = ConflictResolution.CALDAV_WINS
-            elif google_modified > caldav_modified:
-                reason = f"Google more recent ({google_modified} > {caldav_modified})"
-                resolution = ConflictResolution.GOOGLE_WINS
-            else:
-                reason = f"Equal timestamps ({caldav_modified} = {google_modified}), CalDAV wins"
-                resolution = ConflictResolution.CALDAV_WINS
+            try:
+                if caldav_modified > google_modified:
+                    reason = f"CalDAV more recent ({caldav_modified} > {google_modified})"
+                    resolution = ConflictResolution.CALDAV_WINS
+                elif google_modified > caldav_modified:
+                    reason = f"Google more recent ({google_modified} > {caldav_modified})"
+                    resolution = ConflictResolution.GOOGLE_WINS
+                else:
+                    reason = f"Equal timestamps ({caldav_modified} = {google_modified}), CalDAV wins"
+                    resolution = ConflictResolution.CALDAV_WINS
+            except TypeError as e:
+                self.logger.error(f"DATETIME COMPARISON ERROR in conflict resolution: {e}")
+                self.logger.error(f"  caldav_modified: {caldav_modified} (tzinfo: {getattr(caldav_modified, 'tzinfo', None)})")
+                self.logger.error(f"  google_modified: {google_modified} (tzinfo: {getattr(google_modified, 'tzinfo', None)})")
+                raise
         elif caldav_modified:
             reason = f"Only CalDAV has timestamp ({caldav_modified})"
             resolution = ConflictResolution.CALDAV_WINS

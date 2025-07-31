@@ -201,10 +201,13 @@ class CalDAVEvent:
             last_modified = None
             if ical_event.get('LAST-MODIFIED'):
                 last_modified = ical_event.get('LAST-MODIFIED').dt
+                # Add diagnostic logging for datetime parsing
+                print(f"CALDAV MODEL DEBUG: last_modified={last_modified} (type: {type(last_modified)}, tzinfo: {getattr(last_modified, 'tzinfo', None)})")
             
             created = None
             if ical_event.get('CREATED'):
                 created = ical_event.get('CREATED').dt
+                print(f"CALDAV MODEL DEBUG: created={created} (type: {type(created)}, tzinfo: {getattr(created, 'tzinfo', None)})")
             
             sequence = int(ical_event.get('SEQUENCE', 0))
             
