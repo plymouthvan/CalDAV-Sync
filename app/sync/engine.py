@@ -135,6 +135,9 @@ class SyncEngine:
             result.status = "failure"
             result.errors.append(str(e))
             result.completed_at = datetime.utcnow()
+            # Ensure timezone awareness
+            if result.completed_at.tzinfo is None:
+                result.completed_at = pytz.UTC.localize(result.completed_at)
             result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
             
             logger.error(f"Sync failed: {e}")

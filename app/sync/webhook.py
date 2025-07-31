@@ -10,6 +10,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import httpx
+import pytz
 
 from app.database import CalendarMapping, SyncLog, WebhookRetry, get_db
 from app.config import get_settings
@@ -78,7 +79,13 @@ class WebhookClient:
                     }
                 )
                 
-                response_time = (datetime.utcnow() - start_time).total_seconds()
+                end_time = datetime.utcnow()
+                # Ensure timezone awareness for subtraction
+                if end_time.tzinfo is None:
+                    end_time = pytz.UTC.localize(end_time)
+                if start_time.tzinfo is None:
+                    start_time = pytz.UTC.localize(start_time)
+                response_time = (end_time - start_time).total_seconds()
                 
                 # Consider 2xx status codes as success
                 if 200 <= response.status_code < 300:
