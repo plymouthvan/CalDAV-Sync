@@ -279,6 +279,7 @@ class EventDiffer:
                 return pytz.UTC.localize(dt)
             return dt
         
+        # Normalize all datetime objects including those from database
         caldav_modified = normalize_datetime(caldav_modified)
         google_modified = normalize_datetime(google_modified)
         last_caldav_sync = normalize_datetime(last_caldav_sync)
@@ -446,7 +447,11 @@ class EventDiffer:
         
         # Check if CalDAV event has been modified
         if mapping and mapping.last_caldav_modified and caldav_event.last_modified:
-            if caldav_event.last_modified <= mapping.last_caldav_modified:
+            # Normalize database datetime
+            last_caldav_modified = mapping.last_caldav_modified
+            if last_caldav_modified.tzinfo is None:
+                last_caldav_modified = pytz.UTC.localize(last_caldav_modified)
+            if caldav_event.last_modified <= last_caldav_modified:
                 return EventChange(
                     action=ChangeAction.NO_CHANGE,
                     event_uid=caldav_event.uid,
@@ -494,7 +499,11 @@ class EventDiffer:
         
         # Check if Google event has been modified
         if mapping and mapping.last_google_updated and google_event.updated:
-            if google_event.updated <= mapping.last_google_updated:
+            # Normalize database datetime
+            last_google_updated = mapping.last_google_updated
+            if last_google_updated.tzinfo is None:
+                last_google_updated = pytz.UTC.localize(last_google_updated)
+            if google_event.updated <= last_google_updated:
                 return EventChange(
                     action=ChangeAction.NO_CHANGE,
                     event_uid=google_event.uid or google_event.id,
