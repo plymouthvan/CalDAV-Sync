@@ -14,57 +14,6 @@
     </div>
 </div>
 
-<!-- Authentication Status -->
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card text-white" id="auth-status-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Auth Status</h5>
-                        <h3 id="auth-status">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-shield-check fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card text-white" id="token-status-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Token Status</h5>
-                        <h3 id="token-status">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-key fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card text-white bg-info">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Calendar Access</h5>
-                        <h3 id="calendar-access">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-calendar fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Setup Instructions -->
 <div class="row mb-4" id="setup-instructions" style="display: none;">
     <div class="col-12">
@@ -234,50 +183,10 @@ async function loadAuthStatus() {
 }
 
 function updateAuthStatus(data) {
-    // Update auth status card
-    const authElement = document.getElementById('auth-status');
-    const authCard = document.getElementById('auth-status-card');
-    
     const isAuthenticated = data.authenticated || false;
     const hasCredentials = data.has_credentials || false;
-    
-    authElement.textContent = isAuthenticated ? 'Connected' : 'Not Connected';
-    authCard.className = authCard.className.replace(/bg-\w+/, 
-        isAuthenticated ? 'bg-success' : 'bg-danger'
-    );
-    
-    // Update token status card
-    const tokenElement = document.getElementById('token-status');
-    const tokenCard = document.getElementById('token-status-card');
-    
     const tokenValid = data.token_valid || false;
     const tokenExpired = data.token_expired || false;
-    
-    let tokenStatus = 'Unknown';
-    let tokenColor = 'bg-secondary';
-    
-    if (isAuthenticated) {
-        if (tokenExpired) {
-            tokenStatus = 'Expired';
-            tokenColor = 'bg-warning';
-        } else if (tokenValid) {
-            tokenStatus = 'Valid';
-            tokenColor = 'bg-success';
-        } else {
-            tokenStatus = 'Invalid';
-            tokenColor = 'bg-danger';
-        }
-    } else {
-        tokenStatus = 'None';
-        tokenColor = 'bg-secondary';
-    }
-    
-    tokenElement.textContent = tokenStatus;
-    tokenCard.className = tokenCard.className.replace(/bg-\w+/, tokenColor);
-    
-    // Update calendar access
-    const calendarElement = document.getElementById('calendar-access');
-    calendarElement.textContent = isAuthenticated && tokenValid ? 'Available' : 'Unavailable';
     
     // Show/hide sections based on status
     const setupInstructions = document.getElementById('setup-instructions');

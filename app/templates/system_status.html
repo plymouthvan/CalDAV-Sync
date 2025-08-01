@@ -14,73 +14,6 @@
     </div>
 </div>
 
-<!-- System Health Overview -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-white" id="overall-status-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Overall Status</h5>
-                        <h3 id="overall-status">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-heart-pulse fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card text-white" id="database-status-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Database</h5>
-                        <h3 id="database-status">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-database fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card text-white" id="scheduler-status-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Scheduler</h5>
-                        <h3 id="scheduler-status">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-clock fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card text-white" id="google-status-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h5 class="card-title">Google Auth</h5>
-                        <h3 id="google-status">Loading...</h3>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-google fs-1"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Detailed Status Information -->
 <div class="row">
     <div class="col-md-6">
@@ -219,43 +152,6 @@ async function loadSystemStatus() {
 }
 
 function updateHealthStatus(data) {
-    // Update overall status
-    const overallElement = document.getElementById('overall-status');
-    const overallCard = document.getElementById('overall-status-card');
-    
-    overallElement.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
-    overallCard.className = overallCard.className.replace(/bg-\w+/, 
-        data.status === 'healthy' ? 'bg-success' : 
-        data.status === 'degraded' ? 'bg-warning' : 'bg-danger'
-    );
-    
-    // Update database status
-    const dbElement = document.getElementById('database-status');
-    const dbCard = document.getElementById('database-status-card');
-    
-    dbElement.textContent = data.database_connected ? 'Connected' : 'Disconnected';
-    dbCard.className = dbCard.className.replace(/bg-\w+/, 
-        data.database_connected ? 'bg-success' : 'bg-danger'
-    );
-    
-    // Update scheduler status
-    const schedulerElement = document.getElementById('scheduler-status');
-    const schedulerCard = document.getElementById('scheduler-status-card');
-    
-    schedulerElement.textContent = data.scheduler_running ? 'Running' : 'Stopped';
-    schedulerCard.className = schedulerCard.className.replace(/bg-\w+/, 
-        data.scheduler_running ? 'bg-success' : 'bg-danger'
-    );
-    
-    // Update Google auth status
-    const googleElement = document.getElementById('google-status');
-    const googleCard = document.getElementById('google-status-card');
-    
-    googleElement.textContent = data.google_authenticated ? 'Connected' : 'Not Connected';
-    googleCard.className = googleCard.className.replace(/bg-\w+/, 
-        data.google_authenticated ? 'bg-success' : 'bg-secondary'
-    );
-    
     // Update health details
     updateHealthDetails(data);
 }
