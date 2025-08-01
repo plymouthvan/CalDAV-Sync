@@ -359,13 +359,66 @@ class CalDAVClient:
             if not calendar:
                 raise CalDAVCalendarNotFoundError(f"Calendar {calendar_id} not found")
             
-            # Find the event by UID
-            existing_events = calendar.search(uid=event_uid)
-            if not existing_events:
-                self.logger.warning(f"Event {event_uid} not found for deletion")
-                return True  # Already deleted
+            # DIAGNOSTIC: Try different search approaches for iCloud compatibility (same as update_event)
+            self.logger.info(f"CALDAV DELETE DEBUG: Attempting to find event {event_uid}")
             
-            existing_event = existing_events[0]
+            # Try method 1: Direct UID search (current approach)
+            try:
+                existing_events = calendar.search(uid=event_uid)
+                self.logger.info(f"CALDAV DELETE DEBUG: UID search returned {len(existing_events)} events")
+                if existing_events:
+                    existing_event = existing_events[0]
+                    self.logger.info(f"CALDAV DELETE DEBUG: Found event via UID search")
+                else:
+                    self.logger.warning(f"Event {event_uid} not found for deletion via UID search")
+                    return True  # Already deleted
+            except Exception as search_error:
+                self.logger.error(f"CALDAV DELETE DEBUG: UID search failed: {type(search_error).__name__}: {search_error}")
+                
+                # Try method 2: Get all events and filter by UID
+                try:
+                    self.logger.info(f"CALDAV DELETE DEBUG: Trying alternative search method")
+                    from datetime import datetime, timedelta
+                    import pytz
+                    
+                    # Search in a wider date range
+                    start_date = datetime.now() - timedelta(days=365)
+                    end_date = datetime.now() + timedelta(days=365)
+                    if start_date.tzinfo is None:
+                        start_date = pytz.UTC.localize(start_date)
+                    if end_date.tzinfo is None:
+                        end_date = pytz.UTC.localize(end_date)
+                    
+                    all_events = calendar.date_search(start=start_date, end=end_date, expand=True)
+                    self.logger.info(f"CALDAV DELETE DEBUG: Date search returned {len(all_events)} events")
+                    
+                    # Find our event by UID
+                    existing_event = None
+                    for cal_event in all_events:
+                        try:
+                            ical_data = cal_event.data
+                            parsed_events = CalDAVEvent.from_ical(ical_data)
+                            for parsed_event in parsed_events:
+                                if parsed_event.uid == event_uid:
+                                    existing_event = cal_event
+                                    self.logger.info(f"CALDAV DELETE DEBUG: Found event via date search + UID filter")
+                                    break
+                            if existing_event:
+                                break
+                        except Exception as parse_error:
+                            self.logger.warning(f"CALDAV DELETE DEBUG: Failed to parse event during search: {parse_error}")
+                            continue
+                    
+                    if not existing_event:
+                        self.logger.warning(f"Event {event_uid} not found for deletion via alternative search")
+                        return True  # Already deleted
+                        
+                except Exception as alt_search_error:
+                    self.logger.error(f"CALDAV DELETE DEBUG: Alternative search failed: {type(alt_search_error).__name__}: {alt_search_error}")
+                    self.logger.warning(f"Event {event_uid} not found for deletion via any search method")
+                    return True  # Assume already deleted
+            
+            # Delete the event
             existing_event.delete()
             
             self.logger.info(f"Deleted event {event_uid} from calendar {calendar_id}")
