@@ -168,6 +168,12 @@ class EventDiffer:
         """
         changes = []
         
+        # DIAGNOSTIC: Log what we're working with
+        self.logger.info(f"DIFFER DEBUG: Analyzing {direction} changes")
+        self.logger.info(f"DIFFER DEBUG: Source events: {len(source_events)}")
+        self.logger.info(f"DIFFER DEBUG: Target events: {len(target_events)}")
+        self.logger.info(f"DIFFER DEBUG: Existing mappings: {len(existing_mappings)}")
+        
         # Create lookup dictionaries
         source_by_uid = {}
         target_by_uid = {}
@@ -176,13 +182,17 @@ class EventDiffer:
             uid = event.uid if hasattr(event, 'uid') else event.id
             if uid:
                 source_by_uid[uid] = event
+                self.logger.info(f"DIFFER DEBUG: Source event UID {uid}")
         
         for event in target_events:
             uid = event.uid if hasattr(event, 'uid') else event.id
             if uid:
                 target_by_uid[uid] = event
+                self.logger.info(f"DIFFER DEBUG: Target event UID {uid}")
         
         mappings_by_uid = {mapping.caldav_uid: mapping for mapping in existing_mappings}
+        for mapping in existing_mappings:
+            self.logger.info(f"DIFFER DEBUG: Existing mapping UID {mapping.caldav_uid}")
         
         # Process source events
         for source_event in source_events:
@@ -193,10 +203,17 @@ class EventDiffer:
             target_event = target_by_uid.get(source_uid)
             mapping = mappings_by_uid.get(source_uid)
             
+            self.logger.info(f"DIFFER DEBUG: Processing source event {source_uid}")
+            self.logger.info(f"DIFFER DEBUG: - Target event exists: {target_event is not None}")
+            self.logger.info(f"DIFFER DEBUG: - Mapping exists: {mapping is not None}")
+            
             if direction == 'caldav_to_google':
                 change = self._analyze_caldav_to_google_change(source_event, target_event, mapping)
             else:
                 change = self._analyze_google_to_caldav_change(source_event, target_event, mapping)
+            
+            if change:
+                self.logger.info(f"DIFFER DEBUG: - Decision: {change.action.value} - {change.reason}")
             
             if change and change.action != ChangeAction.NO_CHANGE:
                 changes.append(change)
