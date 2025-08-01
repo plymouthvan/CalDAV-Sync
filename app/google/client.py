@@ -269,6 +269,9 @@ class GoogleCalendarClient:
             
             event_data = event.to_google_api_format()
             
+            # Add diagnostic logging for create operations
+            self.logger.info(f"CREATE EVENT DEBUG: Attempting to create event with UID {event.uid}")
+            
             request = service.events().insert(
                 calendarId=calendar_id,
                 body=event_data
@@ -281,6 +284,27 @@ class GoogleCalendarClient:
             self.logger.info(f"Created event {created_event.id} in calendar {calendar_id}")
             return created_event
             
+        except HttpError as e:
+            if e.resp.status == 409:
+                # Handle 409 "duplicate identifier" - event with this iCalUID already exists
+                self.logger.warning(f"Event with UID {event.uid} already exists (409) - attempting to find and update existing event")
+                
+                # Try to find the existing event by UID
+                if event.uid:
+                    existing_events = self.find_events_by_uid(calendar_id, event.uid)
+                    if existing_events:
+                        existing_event = existing_events[0]  # Take the first match
+                        self.logger.info(f"Found existing event {existing_event.id} with UID {event.uid} - updating instead of creating")
+                        
+                        # Update the existing event instead
+                        event.id = existing_event.id  # Set the Google Calendar ID
+                        return self.update_event(calendar_id, event)
+                
+                # If we can't find the existing event, re-raise the original error
+                self.logger.error(f"Could not find existing event with UID {event.uid} to update")
+                raise handle_google_exception(e)
+            else:
+                raise handle_google_exception(e)
         except Exception as e:
             self.logger.error(f"Failed to create event: {e}")
             if not isinstance(e, (GoogleCalendarError, GoogleRateLimitError)):
