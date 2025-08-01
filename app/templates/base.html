@@ -45,11 +45,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if 'sync' in request.url.path %}active{% endif %}" href="{{ url_for('sync_status') }}">
-                            <i class="bi bi-arrow-repeat"></i> Sync Status
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link {% if 'google' in request.url.path %}active{% endif %}" href="{{ url_for('google_auth') }}">
                             <i class="bi bi-google"></i> Google Auth
                         </a>
