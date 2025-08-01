@@ -248,6 +248,8 @@ class CalDAVClient:
     
     def get_events_by_sync_window(self, calendar_id: str, sync_window_days: int) -> List[CalDAVEvent]:
         """Fetch events from a calendar using the sync window configuration."""
+        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: Starting get_events_by_sync_window for calendar {calendar_id}")
+        
         start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date + timedelta(days=sync_window_days)
         
@@ -259,7 +261,9 @@ class CalDAVClient:
         
         self.logger.info(f"CALDAV DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
         
+        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: About to call get_events")
         events = self.get_events(calendar_id, start_date, end_date)
+        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: get_events returned {len(events)} events")
         
         # Log datetime info for fetched events
         for event in events:
@@ -268,6 +272,7 @@ class CalDAVClient:
             self.logger.info(f"  end: {event.end} (type: {type(event.end)}, tzinfo: {getattr(event.end, 'tzinfo', None)})")
             self.logger.info(f"  last_modified: {event.last_modified} (type: {type(event.last_modified)}, tzinfo: {getattr(event.last_modified, 'tzinfo', None)})")
         
+        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: Returning {len(events)} events")
         return events
     
     def create_event(self, calendar_id: str, event: CalDAVEvent) -> bool:
@@ -305,6 +310,9 @@ class CalDAVClient:
             existing_event = existing_events[0]
             
             # COMPREHENSIVE DIAGNOSTIC: Log all available information
+            print(f"CALDAV UPDATE DEBUG: About to update event {event.uid}")
+            print(f"CALDAV UPDATE DEBUG: Event object type: {type(existing_event)}")
+            
             self.logger.info(f"ETAG DEBUG: About to update event {event.uid}")
             self.logger.info(f"ETAG DEBUG: Event object type: {type(existing_event)}")
             self.logger.info(f"ETAG DEBUG: Event object dir: {dir(existing_event)}")
@@ -314,6 +322,7 @@ class CalDAVClient:
             for attr in etag_attrs:
                 if hasattr(existing_event, attr):
                     value = getattr(existing_event, attr)
+                    print(f"CALDAV UPDATE DEBUG: {attr} = {value}")
                     self.logger.info(f"ETAG DEBUG: {attr} = {value}")
             
             # Check if there's a way to get headers from the caldav library
@@ -322,12 +331,15 @@ class CalDAVClient:
             
             # Convert CalDAVEvent to iCal format
             ical_data = self._event_to_ical(event)
+            print(f"CALDAV UPDATE DEBUG: Generated iCal data length: {len(ical_data)}")
             self.logger.info(f"ETAG DEBUG: Generated iCal data length: {len(ical_data)}")
             
             # Update the event
+            print(f"CALDAV UPDATE DEBUG: Calling existing_event.save() without ETag headers")
             self.logger.info(f"ETAG DEBUG: Calling existing_event.save() without ETag headers")
             existing_event.data = ical_data
             existing_event.save()
+            print(f"CALDAV UPDATE DEBUG: existing_event.save() completed")
             
             self.logger.info(f"Updated event {event.uid} in calendar {calendar_id}")
             return True
