@@ -177,6 +177,14 @@ class GoogleCalendarClient:
                 time_min = start_date_utc.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
                 time_max = end_date_utc.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
                 
+                # DEBUG: Log the exact API request parameters
+                self.logger.info(f"GOOGLE API REQUEST DEBUG:")
+                self.logger.info(f"  calendarId: {calendar_id}")
+                self.logger.info(f"  timeMin: {time_min}")
+                self.logger.info(f"  timeMax: {time_max}")
+                self.logger.info(f"  singleEvents: {single_events}")
+                self.logger.info(f"  maxResults: {self.settings.google_calendar.max_results_per_request}")
+                
                 request = service.events().list(
                     calendarId=calendar_id,
                     timeMin=time_min,
@@ -188,6 +196,17 @@ class GoogleCalendarClient:
                 )
                 
                 result = self._execute_with_retry(request)
+                
+                # DEBUG: Log the raw API response
+                self.logger.info(f"GOOGLE API RESPONSE DEBUG:")
+                self.logger.info(f"  items count: {len(result.get('items', []))}")
+                self.logger.info(f"  nextPageToken: {result.get('nextPageToken', 'None')}")
+                if result.get('items'):
+                    for i, item in enumerate(result.get('items', [])):
+                        self.logger.info(f"  item[{i}] id: {item.get('id', 'unknown')}")
+                        self.logger.info(f"  item[{i}] summary: {item.get('summary', 'no summary')}")
+                        start = item.get('start', {})
+                        self.logger.info(f"  item[{i}] start: {start.get('dateTime') or start.get('date', 'no start')}")
                 
                 for item in result.get('items', []):
                     try:
@@ -224,6 +243,7 @@ class GoogleCalendarClient:
         if end_date.tzinfo is None:
             end_date = pytz.UTC.localize(end_date)
         
+        self.logger.info(f"GOOGLE SYNC WINDOW DEBUG: sync_window_days={sync_window_days}")
         self.logger.info(f"GOOGLE DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
         
         events = self.get_events(calendar_id, start_date, end_date)
