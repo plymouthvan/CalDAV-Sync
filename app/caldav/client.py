@@ -210,6 +210,11 @@ class CalDAVClient:
             
             for event in events:
                 try:
+                    # DIAGNOSTIC: Log ETag information during fetch
+                    etag = getattr(event, 'etag', None)
+                    self.logger.info(f"ETAG DEBUG: Fetched event {event.url} with ETag: {etag}")
+                    self.logger.info(f"ETAG DEBUG: Event object type: {type(event)}, attributes: {[attr for attr in dir(event) if 'etag' in attr.lower() or 'tag' in attr.lower()]}")
+                    
                     # Get the event data
                     ical_data = event.data
                     
@@ -288,6 +293,11 @@ class CalDAVClient:
                 raise CalDAVEventError(f"Event {event.uid} not found for update")
             
             existing_event = existing_events[0]
+            
+            # DIAGNOSTIC: Log ETag information
+            etag = getattr(existing_event, 'etag', None)
+            self.logger.info(f"ETAG DEBUG: Event {event.uid} current ETag: {etag}")
+            self.logger.info(f"ETAG DEBUG: Event object attributes: {[attr for attr in dir(existing_event) if 'etag' in attr.lower() or 'tag' in attr.lower()]}")
             
             # Convert CalDAVEvent to iCal format
             ical_data = self._event_to_ical(event)
