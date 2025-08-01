@@ -342,6 +342,33 @@ class EventDiffer:
             self.logger.info(f"  google_hash: {google_hash}")
             self.logger.info(f"  mapping_hash: {mapping_hash}")
             
+            # DEBUG: Log the actual content being hashed to identify differences
+            self.logger.info(f"CONTENT HASH DETAILS DEBUG for UID {caldav_event.uid}:")
+            self.logger.info(f"  CalDAV content parts:")
+            self.logger.info(f"    uid: '{caldav_event.uid or ''}'")
+            self.logger.info(f"    summary: '{caldav_event.summary or ''}'")
+            self.logger.info(f"    description: '{caldav_event.description or ''}'")
+            self.logger.info(f"    location: '{caldav_event.location or ''}'")
+            self.logger.info(f"    start: '{str(caldav_event.start) if caldav_event.start else ''}'")
+            self.logger.info(f"    end: '{str(caldav_event.end) if caldav_event.end else ''}'")
+            self.logger.info(f"    all_day: '{str(caldav_event.all_day)}'")
+            self.logger.info(f"    timezone: '{caldav_event.timezone or ''}'")
+            self.logger.info(f"    rrule: '{caldav_event.rrule or ''}'")
+            self.logger.info(f"    recurrence_id: '{caldav_event.recurrence_id or ''}'")
+            
+            self.logger.info(f"  Google content parts:")
+            self.logger.info(f"    uid: '{google_event.uid or ''}'")
+            self.logger.info(f"    summary: '{google_event.summary or ''}'")
+            self.logger.info(f"    description: '{google_event.description or ''}'")
+            self.logger.info(f"    location: '{google_event.location or ''}'")
+            self.logger.info(f"    start: '{str(google_event.start) if google_event.start else ''}'")
+            self.logger.info(f"    end: '{str(google_event.end) if google_event.end else ''}'")
+            self.logger.info(f"    all_day: '{str(google_event.all_day)}'")
+            self.logger.info(f"    timezone: '{google_event.timezone or ''}'")
+            normalized_recurrence = "|".join(google_event.recurrence or []) if google_event.recurrence else ""
+            self.logger.info(f"    recurrence: '{normalized_recurrence}'")
+            self.logger.info(f"    recurring_event_id: '{google_event.recurring_event_id or ''}'")
+            
             if mapping_hash:
                 caldav_content_changed = caldav_hash != mapping_hash
                 google_content_changed = google_hash != mapping_hash
