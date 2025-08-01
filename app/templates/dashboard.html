@@ -359,7 +359,7 @@ function showSetupAlert() {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
+    const container = document.querySelector('main.container');
     container.insertAdjacentHTML('afterbegin', alertHtml);
     
     sessionStorage.setItem('setup-alert-shown', 'true');
@@ -859,7 +859,7 @@ function showSyncProgressIndicator(totalSyncs) {
         <button type="button" class="btn-close ms-auto" onclick="hideSyncProgressIndicator()"></button>
     `;
     
-    const container = document.querySelector('main .container');
+    const container = document.querySelector('main.container');
     container.insertAdjacentElement('afterbegin', indicator);
 }
 
@@ -927,7 +927,7 @@ function showAlert(message, type) {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
+    const container = document.querySelector('main.container');
     container.insertAdjacentHTML('afterbegin', alertHtml);
     
     // Auto-dismiss after 5 seconds

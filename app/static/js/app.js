@@ -301,7 +301,7 @@ function showAlert(message, type = 'info', duration = 5000) {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
+    const container = document.querySelector('main.container');
     if (container) {
         container.insertAdjacentHTML('afterbegin', alertHtml);
         
