@@ -210,10 +210,20 @@ class CalDAVClient:
             
             for event in events:
                 try:
-                    # DIAGNOSTIC: Log ETag information during fetch
-                    etag = getattr(event, 'etag', None)
-                    self.logger.info(f"ETAG DEBUG: Fetched event {event.url} with ETag: {etag}")
-                    self.logger.info(f"ETAG DEBUG: Event object type: {type(event)}, attributes: {[attr for attr in dir(event) if 'etag' in attr.lower() or 'tag' in attr.lower()]}")
+                    # COMPREHENSIVE DIAGNOSTIC: Log all available information during fetch
+                    self.logger.info(f"ETAG FETCH DEBUG: Processing event {event.url}")
+                    self.logger.info(f"ETAG FETCH DEBUG: Event object type: {type(event)}")
+                    
+                    # Check for ETag in various possible attributes
+                    etag_attrs = ['etag', 'ETag', '_etag', 'headers', 'response_headers', 'props', 'properties']
+                    for attr in etag_attrs:
+                        if hasattr(event, attr):
+                            value = getattr(event, attr)
+                            self.logger.info(f"ETAG FETCH DEBUG: {attr} = {value}")
+                    
+                    # Log all attributes that might contain ETag info
+                    all_attrs = [attr for attr in dir(event) if not attr.startswith('__')]
+                    self.logger.info(f"ETAG FETCH DEBUG: All event attributes: {all_attrs}")
                     
                     # Get the event data
                     ical_data = event.data
@@ -294,15 +304,28 @@ class CalDAVClient:
             
             existing_event = existing_events[0]
             
-            # DIAGNOSTIC: Log ETag information
-            etag = getattr(existing_event, 'etag', None)
-            self.logger.info(f"ETAG DEBUG: Event {event.uid} current ETag: {etag}")
-            self.logger.info(f"ETAG DEBUG: Event object attributes: {[attr for attr in dir(existing_event) if 'etag' in attr.lower() or 'tag' in attr.lower()]}")
+            # COMPREHENSIVE DIAGNOSTIC: Log all available information
+            self.logger.info(f"ETAG DEBUG: About to update event {event.uid}")
+            self.logger.info(f"ETAG DEBUG: Event object type: {type(existing_event)}")
+            self.logger.info(f"ETAG DEBUG: Event object dir: {dir(existing_event)}")
+            
+            # Check for ETag in various possible attributes
+            etag_attrs = ['etag', 'ETag', '_etag', 'headers', 'response_headers']
+            for attr in etag_attrs:
+                if hasattr(existing_event, attr):
+                    value = getattr(existing_event, attr)
+                    self.logger.info(f"ETAG DEBUG: {attr} = {value}")
+            
+            # Check if there's a way to get headers from the caldav library
+            if hasattr(existing_event, 'client') and hasattr(existing_event.client, 'session'):
+                self.logger.info(f"ETAG DEBUG: Client session available: {existing_event.client.session}")
             
             # Convert CalDAVEvent to iCal format
             ical_data = self._event_to_ical(event)
+            self.logger.info(f"ETAG DEBUG: Generated iCal data length: {len(ical_data)}")
             
             # Update the event
+            self.logger.info(f"ETAG DEBUG: Calling existing_event.save() without ETag headers")
             existing_event.data = ical_data
             existing_event.save()
             
