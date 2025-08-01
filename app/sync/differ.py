@@ -662,8 +662,23 @@ class EventDiffer:
         if change.conflict_resolution == ConflictResolution.GOOGLE_WINS:
             return False
         
-        # For non-conflict changes, sync based on direction
-        return self.sync_direction in ["caldav_to_google", "bidirectional"]
+        # For non-conflict changes in bidirectional sync, only sync to Google if CalDAV has changes
+        if self.sync_direction == "bidirectional":
+            # Check the reason to determine which side has changes
+            if "CalDAV event updated" in change.reason:
+                return True
+            elif "Google event updated" in change.reason:
+                return False  # Google changes should sync TO CalDAV, not to Google
+            elif "New CalDAV event" in change.reason:
+                return True
+            elif "New Google event" in change.reason:
+                return False  # New Google events should sync TO CalDAV
+            else:
+                # Default behavior for other cases
+                return True
+        
+        # For unidirectional sync
+        return self.sync_direction == "caldav_to_google"
     
     def _should_sync_to_caldav(self, change: EventChange) -> bool:
         """Determine if change should be synced to CalDAV."""
@@ -676,8 +691,23 @@ class EventDiffer:
         if change.conflict_resolution == ConflictResolution.CALDAV_WINS:
             return False
         
-        # For non-conflict changes, sync based on direction
-        return self.sync_direction in ["google_to_caldav", "bidirectional"]
+        # For non-conflict changes in bidirectional sync, only sync to CalDAV if Google has changes
+        if self.sync_direction == "bidirectional":
+            # Check the reason to determine which side has changes
+            if "Google event updated" in change.reason:
+                return True
+            elif "CalDAV event updated" in change.reason:
+                return False  # CalDAV changes should sync TO Google, not to CalDAV
+            elif "New Google event" in change.reason:
+                return True
+            elif "New CalDAV event" in change.reason:
+                return False  # New CalDAV events should sync TO Google
+            else:
+                # Default behavior for other cases
+                return False
+        
+        # For unidirectional sync
+        return self.sync_direction == "google_to_caldav"
 
 
 class ConflictResolver:
