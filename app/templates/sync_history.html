@@ -143,9 +143,9 @@ async function loadSyncHistory(page = 0) {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const startDate = sevenDaysAgo.toISOString();
         
-        // Use a larger limit to get more records, then filter client-side for now
+        // Use maximum allowed limit to get more records, then filter client-side for now
         // TODO: Move filtering to API level for better performance
-        const response = await fetch(`/api/sync/history?limit=1000&offset=0`);
+        const response = await fetch(`/api/sync/history?limit=500&offset=0`);
         if (!response.ok) throw new Error(`History API error: ${response.status}`);
         
         const data = await response.json();
