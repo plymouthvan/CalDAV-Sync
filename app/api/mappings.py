@@ -35,7 +35,10 @@ async def list_calendar_mappings(
 ):
     """List all calendar mappings with optional filtering."""
     try:
-        query = db.query(CalendarMapping)
+        # Join with CalDAV accounts to get account names
+        query = db.query(CalendarMapping, DBCalDAVAccount.name.label('caldav_account_name')).join(
+            DBCalDAVAccount, CalendarMapping.caldav_account_id == DBCalDAVAccount.id
+        )
         
         if enabled is not None:
             query = query.filter(CalendarMapping.enabled == enabled)
@@ -43,9 +46,32 @@ async def list_calendar_mappings(
         if sync_direction is not None:
             query = query.filter(CalendarMapping.sync_direction == sync_direction.value)
         
-        mappings = query.all()
+        results = query.all()
         
-        return [CalendarMappingResponse.from_orm(mapping) for mapping in mappings]
+        # Build response with account names
+        mappings_with_names = []
+        for mapping, account_name in results:
+            mapping_dict = {
+                "id": mapping.id,
+                "caldav_account_id": mapping.caldav_account_id,
+                "caldav_account_name": account_name,
+                "caldav_calendar_id": mapping.caldav_calendar_id,
+                "caldav_calendar_name": mapping.caldav_calendar_name,
+                "google_calendar_id": mapping.google_calendar_id,
+                "google_calendar_name": mapping.google_calendar_name,
+                "sync_direction": mapping.sync_direction,
+                "sync_window_days": mapping.sync_window_days,
+                "sync_interval_minutes": mapping.sync_interval_minutes,
+                "webhook_url": mapping.webhook_url,
+                "enabled": mapping.enabled,
+                "created_at": mapping.created_at,
+                "updated_at": mapping.updated_at,
+                "last_sync_at": mapping.last_sync_at,
+                "last_sync_status": mapping.last_sync_status
+            }
+            mappings_with_names.append(CalendarMappingResponse(**mapping_dict))
+        
+        return mappings_with_names
         
     except Exception as e:
         logger.error(f"Failed to list calendar mappings: {e}")

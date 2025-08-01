@@ -154,6 +154,7 @@ class CalendarMappingResponse(BaseModel):
     """Response model for calendar mapping."""
     id: str
     caldav_account_id: str
+    caldav_account_name: str  # Added for UI display
     caldav_calendar_id: str
     caldav_calendar_name: str
     google_calendar_id: str
@@ -181,6 +182,7 @@ class SyncTriggerRequest(BaseModel):
 class SyncResultResponse(BaseModel):
     """Response model for sync result."""
     mapping_id: str
+    caldav_account_name: Optional[str] = None    # Added for UI display
     direction: SyncDirection
     status: SyncStatus
     inserted_count: int

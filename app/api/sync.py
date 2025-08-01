@@ -181,7 +181,17 @@ async def get_sync_history(
 ):
     """Get sync history with optional filtering."""
     try:
-        query = db.query(SyncLog)
+        from app.database import DBCalDAVAccount
+        
+        # Join sync logs with calendar mappings and CalDAV accounts to get account names
+        query = db.query(
+            SyncLog,
+            DBCalDAVAccount.name.label('caldav_account_name')
+        ).join(
+            CalendarMapping, SyncLog.mapping_id == CalendarMapping.id
+        ).join(
+            DBCalDAVAccount, CalendarMapping.caldav_account_id == DBCalDAVAccount.id
+        )
         
         if mapping_id:
             query = query.filter(SyncLog.mapping_id == mapping_id)
@@ -196,10 +206,10 @@ async def get_sync_history(
         total_count = query.count()
         
         # Apply pagination and ordering
-        sync_logs = query.order_by(SyncLog.started_at.desc()).offset(offset).limit(limit).all()
+        sync_results = query.order_by(SyncLog.started_at.desc()).offset(offset).limit(limit).all()
         
         results = []
-        for log in sync_logs:
+        for log, account_name in sync_results:
             # Parse event summaries from JSON if available
             event_summaries = None
             if log.event_summaries:
@@ -211,6 +221,7 @@ async def get_sync_history(
             
             results.append(SyncResultResponse(
                 mapping_id=log.mapping_id,
+                caldav_account_name=account_name,
                 direction=SyncDirection(log.direction),
                 status=SyncStatus(log.status),
                 inserted_count=log.inserted_count or 0,

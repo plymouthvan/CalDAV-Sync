@@ -566,11 +566,20 @@ function updateRecentActivity(activities) {
             statusText = activity.status || 'Unknown';
         }
         
-        // Format sync direction more clearly
-        const directionText = activity.direction === 'caldav_to_google' ? 'CalDAV → Google' :
-                             activity.direction === 'google_to_caldav' ? 'Google → CalDAV' :
-                             activity.direction === 'bidirectional' ? 'Bidirectional' :
-                             activity.direction;
+        // Format sync direction more clearly with account name
+        let directionText;
+        if (activity.caldav_account_name) {
+            directionText = activity.direction === 'caldav_to_google' ? `${activity.caldav_account_name} → Google` :
+                           activity.direction === 'google_to_caldav' ? `Google → ${activity.caldav_account_name}` :
+                           activity.direction === 'bidirectional' ? `${activity.caldav_account_name} ↔ Google` :
+                           activity.direction;
+        } else {
+            // Fallback to generic direction if account name not available
+            directionText = activity.direction === 'caldav_to_google' ? 'CalDAV → Google' :
+                           activity.direction === 'google_to_caldav' ? 'Google → CalDAV' :
+                           activity.direction === 'bidirectional' ? 'Bidirectional' :
+                           activity.direction;
+        }
         
         // Calculate total events processed
         const totalEvents = (activity.inserted_count || 0) + (activity.updated_count || 0) + (activity.deleted_count || 0);
@@ -681,7 +690,7 @@ function updateMappingsOverview(mappings) {
         return `
             <div class="row align-items-center border-bottom py-2">
                 <div class="col-md-4">
-                    <strong>${mapping.caldav_calendar_name}</strong>
+                    <strong>${mapping.caldav_account_name || mapping.caldav_calendar_name}</strong>
                     <br>
                     <small class="text-muted">→ ${mapping.google_calendar_name}</small>
                 </div>

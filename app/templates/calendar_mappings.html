@@ -184,7 +184,7 @@ async function loadMappings() {
                         <div class="row align-items-center">
                             <div class="col-md-6">
                                 <h5 class="card-title">
-                                    ${mapping.caldav_calendar_name} ${directionIcon} ${mapping.google_calendar_name}
+                                    ${mapping.caldav_account_name || mapping.caldav_calendar_name} ${directionIcon} ${mapping.google_calendar_name}
                                 </h5>
                                 <p class="card-text text-muted">
                                     Sync every ${mapping.sync_interval_minutes} minutes
