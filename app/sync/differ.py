@@ -65,7 +65,7 @@ class EventDiffer:
         self.sync_direction = sync_direction
         self.logger = SyncLogger(mapping_id, sync_direction)
     
-    def analyze_bidirectional_changes(self, 
+    def analyze_bidirectional_changes(self,
                                     caldav_events: List[CalDAVEvent],
                                     google_events: List[GoogleCalendarEvent],
                                     existing_mappings: List[EventMapping]) -> SyncChanges:
@@ -80,6 +80,19 @@ class EventDiffer:
         Returns:
             SyncChanges object with all detected changes
         """
+        # DIAGNOSTIC: Log what we're working with
+        self.logger.info(f"BIDIRECTIONAL SYNC DEBUG: Analyzing changes")
+        self.logger.info(f"  CalDAV events: {len(caldav_events)}")
+        self.logger.info(f"  Google events: {len(google_events)}")
+        self.logger.info(f"  Existing mappings: {len(existing_mappings)}")
+        
+        for event in caldav_events:
+            self.logger.info(f"  CalDAV event UID: {event.uid}")
+        for event in google_events:
+            self.logger.info(f"  Google event UID: {event.uid}, ID: {event.id}")
+        for mapping in existing_mappings:
+            self.logger.info(f"  Mapping: CalDAV UID {mapping.caldav_uid} -> Google ID {mapping.google_event_id}")
+        
         # Create lookup dictionaries
         caldav_by_uid = {event.uid: event for event in caldav_events}
         google_by_uid = {event.uid: event for event in google_events if event.uid}
@@ -127,13 +140,26 @@ class EventDiffer:
             
             processed_uids.add(google_event.uid)
             
-            # Find mapping by Google event ID
+            # Find mapping by Google event ID OR by CalDAV UID (for deletion detection)
             mapping = mappings_by_google_id.get(google_event.id) if google_event.id else None
+            if not mapping and google_event.uid:
+                # Also check by CalDAV UID - this is crucial for deletion detection
+                mapping = mappings_by_caldav_uid.get(google_event.uid)
+            
+            self.logger.info(f"BIDIRECTIONAL SYNC DEBUG: Processing Google event {google_event.uid} (ID: {google_event.id})")
+            self.logger.info(f"  Mapping found: {mapping is not None}")
+            if mapping:
+                self.logger.info(f"  Mapping details: CalDAV UID {mapping.caldav_uid} -> Google ID {mapping.google_event_id}")
             
             change = self._analyze_event_pair(None, google_event, mapping)
+            if change:
+                self.logger.info(f"  Change detected: {change.action.value} - {change.reason}")
+            
             if change and change.action != ChangeAction.NO_CHANGE:
                 if self._should_sync_to_caldav(change):
                     changes.google_to_caldav.append(change)
+                elif self._should_sync_to_google(change):
+                    changes.caldav_to_google.append(change)
         
         # Process orphaned mappings (events that no longer exist in either system)
         for mapping in existing_mappings:
