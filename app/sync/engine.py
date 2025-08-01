@@ -387,6 +387,10 @@ class SyncEngine:
                 
                 elif change.action == ChangeAction.DELETE:
                     if change.existing_mapping and change.existing_mapping.google_event_id:
+                        # Add diagnostic logging for delete operations
+                        logger.info(f"SYNC DELETE DEBUG: Attempting to delete Google event {change.existing_mapping.google_event_id} for CalDAV UID {change.event_uid}")
+                        logger.info(f"SYNC DELETE DEBUG: Event mapping ID {change.existing_mapping.id}, last sync direction: {change.existing_mapping.sync_direction_last}")
+                        
                         # Delete event from Google Calendar
                         self.google_client.delete_event(mapping.google_calendar_id, change.existing_mapping.google_event_id)
                         

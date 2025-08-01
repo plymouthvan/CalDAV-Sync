@@ -321,6 +321,9 @@ class GoogleCalendarClient:
         try:
             service = self._get_service()
             
+            # Add diagnostic logging for delete operations
+            self.logger.info(f"DELETE EVENT DEBUG: Attempting to delete event {event_id} from calendar {calendar_id}")
+            
             request = service.events().delete(
                 calendarId=calendar_id,
                 eventId=event_id
@@ -333,9 +336,15 @@ class GoogleCalendarClient:
             
         except HttpError as e:
             if e.resp.status == 404:
-                self.logger.warning(f"Event {event_id} not found for deletion")
+                self.logger.warning(f"Event {event_id} not found for deletion (404) - treating as successful")
                 return True  # Already deleted
-            raise handle_google_exception(e)
+            elif e.resp.status == 410:
+                # Handle 410 "Resource has been deleted" - same as 404, event is gone
+                self.logger.warning(f"Event {event_id} already deleted (410) - treating as successful")
+                return True  # Already deleted
+            else:
+                self.logger.error(f"DELETE EVENT DEBUG: HTTP {e.resp.status} error for event {event_id}: {e}")
+                raise handle_google_exception(e)
         except Exception as e:
             self.logger.error(f"Failed to delete event {event_id}: {e}")
             if not isinstance(e, (GoogleCalendarError, GoogleRateLimitError)):

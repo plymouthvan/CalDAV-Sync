@@ -162,10 +162,18 @@ def handle_google_exception(e: Exception) -> GoogleCalendarError:
     """Convert generic Google API exceptions to our custom exceptions."""
     error_message = str(e).lower()
     
+    # Check for HTTP status codes if available
+    status_code = None
+    if hasattr(e, 'resp') and hasattr(e.resp, 'status'):
+        status_code = e.resp.status
+    
     if "oauth" in error_message or "unauthorized" in error_message:
         return GoogleOAuthError(f"Google OAuth failed: {e}")
-    elif "not found" in error_message or "404" in error_message:
+    elif "not found" in error_message or "404" in error_message or status_code == 404:
         return GoogleCalendarNotFoundError(f"Google Calendar not found: {e}")
+    elif status_code == 410 or "resource has been deleted" in error_message:
+        # 410 Gone - resource has been deleted, treat similar to 404
+        return GoogleCalendarNotFoundError(f"Google Calendar resource deleted: {e}")
     elif "rate limit" in error_message or "quota" in error_message:
         # Try to extract retry-after from the exception if available
         retry_after = None
