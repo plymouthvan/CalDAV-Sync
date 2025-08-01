@@ -171,8 +171,28 @@ async def create_calendar_mapping(
                 # The mapping is created, just not scheduled
                 logger.warning("Mapping created but not scheduled - manual scheduling may be required")
         
+        # Build response with account name
+        mapping_dict = {
+            "id": db_mapping.id,
+            "caldav_account_id": db_mapping.caldav_account_id,
+            "caldav_account_name": caldav_account.name,
+            "caldav_calendar_id": db_mapping.caldav_calendar_id,
+            "caldav_calendar_name": db_mapping.caldav_calendar_name,
+            "google_calendar_id": db_mapping.google_calendar_id,
+            "google_calendar_name": db_mapping.google_calendar_name,
+            "sync_direction": db_mapping.sync_direction,
+            "sync_window_days": db_mapping.sync_window_days,
+            "sync_interval_minutes": db_mapping.sync_interval_minutes,
+            "webhook_url": db_mapping.webhook_url,
+            "enabled": db_mapping.enabled,
+            "created_at": db_mapping.created_at,
+            "updated_at": db_mapping.updated_at,
+            "last_sync_at": db_mapping.last_sync_at,
+            "last_sync_status": db_mapping.last_sync_status
+        }
+        
         logger.info(f"Created calendar mapping: {db_mapping.id}")
-        return CalendarMappingResponse.from_orm(db_mapping)
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
@@ -192,14 +212,37 @@ async def get_calendar_mapping(
 ):
     """Get a specific calendar mapping."""
     try:
-        mapping = db.query(CalendarMapping).filter(
-            CalendarMapping.id == mapping_id
-        ).first()
+        # Join with CalDAV accounts to get account name
+        result = db.query(CalendarMapping, CalDAVAccount.name.label('caldav_account_name')).join(
+            CalDAVAccount, CalendarMapping.caldav_account_id == CalDAVAccount.id
+        ).filter(CalendarMapping.id == mapping_id).first()
         
-        if not mapping:
+        if not result:
             raise HTTPException(status_code=404, detail="Calendar mapping not found")
         
-        return CalendarMappingResponse.from_orm(mapping)
+        mapping, account_name = result
+        
+        # Build response with account name
+        mapping_dict = {
+            "id": mapping.id,
+            "caldav_account_id": mapping.caldav_account_id,
+            "caldav_account_name": account_name,
+            "caldav_calendar_id": mapping.caldav_calendar_id,
+            "caldav_calendar_name": mapping.caldav_calendar_name,
+            "google_calendar_id": mapping.google_calendar_id,
+            "google_calendar_name": mapping.google_calendar_name,
+            "sync_direction": mapping.sync_direction,
+            "sync_window_days": mapping.sync_window_days,
+            "sync_interval_minutes": mapping.sync_interval_minutes,
+            "webhook_url": mapping.webhook_url,
+            "enabled": mapping.enabled,
+            "created_at": mapping.created_at,
+            "updated_at": mapping.updated_at,
+            "last_sync_at": mapping.last_sync_at,
+            "last_sync_status": mapping.last_sync_status
+        }
+        
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
@@ -244,8 +287,33 @@ async def update_calendar_mapping(
         scheduler = get_sync_scheduler()
         await scheduler.reschedule_mapping(mapping)
         
+        # Get the account name for the response
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping.caldav_account_id
+        ).first()
+        
+        # Build response with account name
+        mapping_dict = {
+            "id": mapping.id,
+            "caldav_account_id": mapping.caldav_account_id,
+            "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+            "caldav_calendar_id": mapping.caldav_calendar_id,
+            "caldav_calendar_name": mapping.caldav_calendar_name,
+            "google_calendar_id": mapping.google_calendar_id,
+            "google_calendar_name": mapping.google_calendar_name,
+            "sync_direction": mapping.sync_direction,
+            "sync_window_days": mapping.sync_window_days,
+            "sync_interval_minutes": mapping.sync_interval_minutes,
+            "webhook_url": mapping.webhook_url,
+            "enabled": mapping.enabled,
+            "created_at": mapping.created_at,
+            "updated_at": mapping.updated_at,
+            "last_sync_at": mapping.last_sync_at,
+            "last_sync_status": mapping.last_sync_status
+        }
+        
         logger.info(f"Updated calendar mapping: {mapping_id}")
-        return CalendarMappingResponse.from_orm(mapping)
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
@@ -314,7 +382,32 @@ async def enable_calendar_mapping(
             raise HTTPException(status_code=404, detail="Calendar mapping not found")
         
         if mapping.enabled:
-            return CalendarMappingResponse.from_orm(mapping)
+            # Get the account name for the response
+            caldav_account = db.query(CalDAVAccount).filter(
+                CalDAVAccount.id == mapping.caldav_account_id
+            ).first()
+            
+            # Build response with account name
+            mapping_dict = {
+                "id": mapping.id,
+                "caldav_account_id": mapping.caldav_account_id,
+                "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+                "caldav_calendar_id": mapping.caldav_calendar_id,
+                "caldav_calendar_name": mapping.caldav_calendar_name,
+                "google_calendar_id": mapping.google_calendar_id,
+                "google_calendar_name": mapping.google_calendar_name,
+                "sync_direction": mapping.sync_direction,
+                "sync_window_days": mapping.sync_window_days,
+                "sync_interval_minutes": mapping.sync_interval_minutes,
+                "webhook_url": mapping.webhook_url,
+                "enabled": mapping.enabled,
+                "created_at": mapping.created_at,
+                "updated_at": mapping.updated_at,
+                "last_sync_at": mapping.last_sync_at,
+                "last_sync_status": mapping.last_sync_status
+            }
+            
+            return CalendarMappingResponse(**mapping_dict)
         
         # Verify CalDAV account is enabled
         caldav_account = db.query(CalDAVAccount).filter(
@@ -346,8 +439,33 @@ async def enable_calendar_mapping(
         scheduler = get_sync_scheduler()
         await scheduler.schedule_mapping(mapping)
         
+        # Get the account name for the response
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping.caldav_account_id
+        ).first()
+        
+        # Build response with account name
+        mapping_dict = {
+            "id": mapping.id,
+            "caldav_account_id": mapping.caldav_account_id,
+            "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+            "caldav_calendar_id": mapping.caldav_calendar_id,
+            "caldav_calendar_name": mapping.caldav_calendar_name,
+            "google_calendar_id": mapping.google_calendar_id,
+            "google_calendar_name": mapping.google_calendar_name,
+            "sync_direction": mapping.sync_direction,
+            "sync_window_days": mapping.sync_window_days,
+            "sync_interval_minutes": mapping.sync_interval_minutes,
+            "webhook_url": mapping.webhook_url,
+            "enabled": mapping.enabled,
+            "created_at": mapping.created_at,
+            "updated_at": mapping.updated_at,
+            "last_sync_at": mapping.last_sync_at,
+            "last_sync_status": mapping.last_sync_status
+        }
+        
         logger.info(f"Enabled calendar mapping: {mapping_id}")
-        return CalendarMappingResponse.from_orm(mapping)
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
@@ -375,7 +493,32 @@ async def disable_calendar_mapping(
             raise HTTPException(status_code=404, detail="Calendar mapping not found")
         
         if not mapping.enabled:
-            return CalendarMappingResponse.from_orm(mapping)
+            # Get the account name for the response
+            caldav_account = db.query(CalDAVAccount).filter(
+                CalDAVAccount.id == mapping.caldav_account_id
+            ).first()
+            
+            # Build response with account name
+            mapping_dict = {
+                "id": mapping.id,
+                "caldav_account_id": mapping.caldav_account_id,
+                "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+                "caldav_calendar_id": mapping.caldav_calendar_id,
+                "caldav_calendar_name": mapping.caldav_calendar_name,
+                "google_calendar_id": mapping.google_calendar_id,
+                "google_calendar_name": mapping.google_calendar_name,
+                "sync_direction": mapping.sync_direction,
+                "sync_window_days": mapping.sync_window_days,
+                "sync_interval_minutes": mapping.sync_interval_minutes,
+                "webhook_url": mapping.webhook_url,
+                "enabled": mapping.enabled,
+                "created_at": mapping.created_at,
+                "updated_at": mapping.updated_at,
+                "last_sync_at": mapping.last_sync_at,
+                "last_sync_status": mapping.last_sync_status
+            }
+            
+            return CalendarMappingResponse(**mapping_dict)
         
         mapping.enabled = False
         mapping.updated_at = datetime.utcnow()
@@ -387,8 +530,33 @@ async def disable_calendar_mapping(
         scheduler = get_sync_scheduler()
         await scheduler.unschedule_mapping(mapping_id)
         
+        # Get the account name for the response
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping.caldav_account_id
+        ).first()
+        
+        # Build response with account name
+        mapping_dict = {
+            "id": mapping.id,
+            "caldav_account_id": mapping.caldav_account_id,
+            "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+            "caldav_calendar_id": mapping.caldav_calendar_id,
+            "caldav_calendar_name": mapping.caldav_calendar_name,
+            "google_calendar_id": mapping.google_calendar_id,
+            "google_calendar_name": mapping.google_calendar_name,
+            "sync_direction": mapping.sync_direction,
+            "sync_window_days": mapping.sync_window_days,
+            "sync_interval_minutes": mapping.sync_interval_minutes,
+            "webhook_url": mapping.webhook_url,
+            "enabled": mapping.enabled,
+            "created_at": mapping.created_at,
+            "updated_at": mapping.updated_at,
+            "last_sync_at": mapping.last_sync_at,
+            "last_sync_status": mapping.last_sync_status
+        }
+        
         logger.info(f"Disabled calendar mapping: {mapping_id}")
-        return CalendarMappingResponse.from_orm(mapping)
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
@@ -422,8 +590,33 @@ async def pause_calendar_mapping(
         scheduler = get_sync_scheduler()
         await scheduler.pause_mapping(mapping_id)
         
+        # Get the account name for the response
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping.caldav_account_id
+        ).first()
+        
+        # Build response with account name
+        mapping_dict = {
+            "id": mapping.id,
+            "caldav_account_id": mapping.caldav_account_id,
+            "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+            "caldav_calendar_id": mapping.caldav_calendar_id,
+            "caldav_calendar_name": mapping.caldav_calendar_name,
+            "google_calendar_id": mapping.google_calendar_id,
+            "google_calendar_name": mapping.google_calendar_name,
+            "sync_direction": mapping.sync_direction,
+            "sync_window_days": mapping.sync_window_days,
+            "sync_interval_minutes": mapping.sync_interval_minutes,
+            "webhook_url": mapping.webhook_url,
+            "enabled": mapping.enabled,
+            "created_at": mapping.created_at,
+            "updated_at": mapping.updated_at,
+            "last_sync_at": mapping.last_sync_at,
+            "last_sync_status": mapping.last_sync_status
+        }
+        
         logger.info(f"Paused calendar mapping: {mapping_id}")
-        return CalendarMappingResponse.from_orm(mapping)
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
@@ -456,8 +649,33 @@ async def resume_calendar_mapping(
         scheduler = get_sync_scheduler()
         await scheduler.resume_mapping(mapping_id)
         
+        # Get the account name for the response
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping.caldav_account_id
+        ).first()
+        
+        # Build response with account name
+        mapping_dict = {
+            "id": mapping.id,
+            "caldav_account_id": mapping.caldav_account_id,
+            "caldav_account_name": caldav_account.name if caldav_account else "Unknown Account",
+            "caldav_calendar_id": mapping.caldav_calendar_id,
+            "caldav_calendar_name": mapping.caldav_calendar_name,
+            "google_calendar_id": mapping.google_calendar_id,
+            "google_calendar_name": mapping.google_calendar_name,
+            "sync_direction": mapping.sync_direction,
+            "sync_window_days": mapping.sync_window_days,
+            "sync_interval_minutes": mapping.sync_interval_minutes,
+            "webhook_url": mapping.webhook_url,
+            "enabled": mapping.enabled,
+            "created_at": mapping.created_at,
+            "updated_at": mapping.updated_at,
+            "last_sync_at": mapping.last_sync_at,
+            "last_sync_status": mapping.last_sync_status
+        }
+        
         logger.info(f"Resumed calendar mapping: {mapping_id}")
-        return CalendarMappingResponse.from_orm(mapping)
+        return CalendarMappingResponse(**mapping_dict)
         
     except HTTPException:
         raise
