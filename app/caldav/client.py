@@ -309,10 +309,21 @@ class CalDAVClient:
             
             print(f"CALDAV UPDATE DEBUG: Searching for event {event.uid}")
             # Find the existing event by UID
-            existing_events = calendar.search(uid=event.uid)
+            try:
+                existing_events = calendar.search(uid=event.uid)
+                print(f"CALDAV UPDATE DEBUG: Search completed, found {len(existing_events)} events")
+            except Exception as search_error:
+                print(f"CALDAV UPDATE DEBUG: Search failed with error: {type(search_error).__name__}: {search_error}")
+                # If search fails with 412, the event might not exist - try to create it instead
+                if "412" in str(search_error):
+                    print(f"CALDAV UPDATE DEBUG: 412 error during search, attempting to create event instead")
+                    return self.create_event(calendar_id, event)
+                else:
+                    raise search_error
+            
             if not existing_events:
-                print(f"CALDAV UPDATE DEBUG: Event {event.uid} not found for update")
-                raise CalDAVEventError(f"Event {event.uid} not found for update")
+                print(f"CALDAV UPDATE DEBUG: Event {event.uid} not found for update, creating instead")
+                return self.create_event(calendar_id, event)
             
             print(f"CALDAV UPDATE DEBUG: Found {len(existing_events)} existing events")
             existing_event = existing_events[0]
