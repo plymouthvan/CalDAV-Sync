@@ -79,6 +79,64 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Account Modal -->
+<div class="modal fade" id="editAccountModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit CalDAV Account</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editAccountForm">
+                    <input type="hidden" id="editAccountId" name="accountId">
+                    
+                    <div class="mb-3">
+                        <label for="editAccountName" class="form-label">Account Name</label>
+                        <input type="text" class="form-control" id="editAccountName" name="accountName" required>
+                        <div class="form-text">A friendly name for this account</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editBaseUrl" class="form-label">Server URL</label>
+                        <input type="url" class="form-control" id="editBaseUrl" name="baseUrl" required>
+                        <div class="form-text">CalDAV server URL (e.g., https://caldav.example.com/)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUsername" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="editUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="editPassword" name="password">
+                        <div class="form-text">Leave blank to keep current password</div>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="editVerifySSL" name="verifySSL" checked>
+                        <label class="form-check-label" for="editVerifySSL">
+                            Verify SSL certificates
+                        </label>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="editEnabled" name="enabled" checked>
+                        <label class="form-check-label" for="editEnabled">
+                            Enable this account
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-outline-primary" onclick="testEditedAccount()">
+                    <i class="bi bi-wifi"></i> Test Connection
+                </button>
+                <button type="button" class="btn btn-primary" onclick="updateAccount()">
+                    <i class="bi bi-check-circle"></i> Update Account
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -295,9 +353,161 @@ async function deleteAccount(accountId) {
     }
 }
 
-function editAccount(accountId) {
-    // TODO: Implement edit functionality
-    showAlert('Edit functionality coming soon!', 'info');
+async function editAccount(accountId) {
+    try {
+        // Show loading state
+        showAlert('Loading account details...', 'info');
+        
+        // Fetch the account data
+        const response = await fetch(`/api/caldav/accounts/${accountId}`);
+        if (!response.ok) {
+            const error = await response.json();
+            showAlert(`Failed to load account: ${error.detail}`, 'error');
+            return;
+        }
+        
+        const account = await response.json();
+        
+        // Clear any existing alerts
+        const existingAlerts = document.querySelectorAll('.alert');
+        existingAlerts.forEach(alert => alert.remove());
+        
+        // Populate the edit form
+        document.getElementById('editAccountId').value = account.id;
+        document.getElementById('editAccountName').value = account.name;
+        document.getElementById('editBaseUrl').value = account.base_url;
+        document.getElementById('editUsername').value = account.username;
+        document.getElementById('editPassword').value = ''; // Always start empty for security
+        document.getElementById('editVerifySSL').checked = account.verify_ssl;
+        document.getElementById('editEnabled').checked = account.enabled;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('editAccountModal'));
+        modal.show();
+        
+        // Reset form validation state
+        const form = document.getElementById('editAccountForm');
+        form.classList.remove('was-validated');
+        
+    } catch (error) {
+        console.error('Error loading account for edit:', error);
+        showAlert('Error loading account: ' + error.message, 'error');
+    }
+}
+
+async function testEditedAccount() {
+    const form = document.getElementById('editAccountForm');
+    const testButton = document.querySelector('#editAccountModal .btn-outline-primary');
+    
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        form.reportValidity();
+        return;
+    }
+    
+    const accountData = {
+        username: document.getElementById('editUsername').value,
+        password: document.getElementById('editPassword').value,
+        base_url: document.getElementById('editBaseUrl').value,
+        verify_ssl: document.getElementById('editVerifySSL').checked
+    };
+    
+    // If password is empty, we can't test the connection
+    if (!accountData.password) {
+        showAlert('Please enter the password to test the connection', 'error');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const originalButtonText = testButton.innerHTML;
+        testButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Testing...';
+        testButton.disabled = true;
+        
+        const response = await fetch('/api/caldav/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(accountData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Connection test successful!', 'success');
+        } else {
+            showAlert(`Connection test failed: ${result.error_message}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error testing account:', error);
+        showAlert('Error testing account: ' + error.message, 'error');
+    } finally {
+        // Reset button state
+        testButton.innerHTML = '<i class="bi bi-wifi"></i> Test Connection';
+        testButton.disabled = false;
+    }
+}
+
+async function updateAccount() {
+    const accountId = document.getElementById('editAccountId').value;
+    const form = document.getElementById('editAccountForm');
+    const updateButton = document.querySelector('#editAccountModal .btn-primary');
+    
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        form.reportValidity();
+        return;
+    }
+    
+    const accountData = {
+        name: document.getElementById('editAccountName').value,
+        base_url: document.getElementById('editBaseUrl').value,
+        username: document.getElementById('editUsername').value,
+        verify_ssl: document.getElementById('editVerifySSL').checked,
+        enabled: document.getElementById('editEnabled').checked
+    };
+    
+    // Only include password if it's provided
+    const password = document.getElementById('editPassword').value;
+    if (password) {
+        accountData.password = password;
+    }
+    
+    try {
+        // Show loading state
+        const originalButtonText = updateButton.innerHTML;
+        updateButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+        updateButton.disabled = true;
+        
+        const response = await fetch(`/api/caldav/accounts/${accountId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(accountData)
+        });
+        
+        if (response.ok) {
+            showAlert('CalDAV account updated successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editAccountModal')).hide();
+            form.reset();
+            form.classList.remove('was-validated');
+            loadAccounts();
+        } else {
+            const error = await response.json();
+            showAlert(`Failed to update account: ${error.detail}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error updating account:', error);
+        showAlert('Error updating account: ' + error.message, 'error');
+    } finally {
+        // Reset button state
+        updateButton.innerHTML = '<i class="bi bi-check-circle"></i> Update Account';
+        updateButton.disabled = false;
+    }
 }
 
 function showAlert(message, type) {

@@ -126,6 +126,98 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Mapping Modal -->
+<div class="modal fade" id="editMappingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Calendar Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editMappingForm">
+                    <input type="hidden" id="editMappingId" name="mappingId">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>CalDAV Calendar</h6>
+                            <div class="mb-3">
+                                <label for="editCaldavAccountName" class="form-label">CalDAV Account</label>
+                                <input type="text" class="form-control" id="editCaldavAccountName" readonly>
+                                <div class="form-text">Account cannot be changed when editing</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editCaldavCalendarName" class="form-label">CalDAV Calendar</label>
+                                <input type="text" class="form-control" id="editCaldavCalendarName" readonly>
+                                <div class="form-text">Calendar cannot be changed when editing</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Google Calendar</h6>
+                            <div class="mb-3">
+                                <label for="editGoogleCalendarName" class="form-label">Google Calendar</label>
+                                <input type="text" class="form-control" id="editGoogleCalendarName" readonly>
+                                <div class="form-text">Calendar cannot be changed when editing</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSyncDirection" class="form-label">Sync Direction</label>
+                                <select class="form-select" id="editSyncDirection" required>
+                                    <option value="caldav_to_google">CalDAV → Google</option>
+                                    <option value="google_to_caldav">Google → CalDAV</option>
+                                    <option value="bidirectional">Bidirectional</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSyncInterval" class="form-label">Sync Interval (minutes)</label>
+                                <input type="number" class="form-control" id="editSyncInterval" min="1" max="1440" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editSyncWindow" class="form-label">Sync Window (days)</label>
+                                <input type="number" class="form-control" id="editSyncWindow" min="1" max="365" required>
+                                <div class="form-text">How many days forward to sync</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editWebhookUrl" class="form-label">Webhook URL (optional)</label>
+                                <input type="url" class="form-control" id="editWebhookUrl">
+                                <div class="form-text">URL to notify when sync completes</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="editEnableMapping">
+                        <label class="form-check-label" for="editEnableMapping">
+                            Enable this mapping
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateMapping()">
+                    <i class="bi bi-check-circle"></i> Update Mapping
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -454,9 +546,102 @@ async function deleteMapping(mappingId) {
     }
 }
 
-function editMapping(mappingId) {
-    // TODO: Implement edit functionality
-    showAlert('Edit functionality coming soon!', 'info');
+async function editMapping(mappingId) {
+    try {
+        // Show loading state
+        showAlert('Loading mapping details...', 'info');
+        
+        // Fetch the mapping data
+        const response = await fetch(`/api/mappings/${mappingId}`);
+        if (!response.ok) {
+            const error = await response.json();
+            showAlert(`Failed to load mapping: ${error.detail}`, 'error');
+            return;
+        }
+        
+        const mapping = await response.json();
+        
+        // Clear any existing alerts
+        const existingAlerts = document.querySelectorAll('.alert');
+        existingAlerts.forEach(alert => alert.remove());
+        
+        // Populate the edit form
+        document.getElementById('editMappingId').value = mapping.id;
+        document.getElementById('editCaldavAccountName').value = mapping.caldav_account_name || 'Unknown Account';
+        document.getElementById('editCaldavCalendarName').value = mapping.caldav_calendar_name;
+        document.getElementById('editGoogleCalendarName').value = mapping.google_calendar_name;
+        document.getElementById('editSyncDirection').value = mapping.sync_direction;
+        document.getElementById('editSyncInterval').value = mapping.sync_interval_minutes;
+        document.getElementById('editSyncWindow').value = mapping.sync_window_days;
+        document.getElementById('editWebhookUrl').value = mapping.webhook_url || '';
+        document.getElementById('editEnableMapping').checked = mapping.enabled;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('editMappingModal'));
+        modal.show();
+        
+        // Reset form validation state
+        const form = document.getElementById('editMappingForm');
+        form.classList.remove('was-validated');
+        
+    } catch (error) {
+        console.error('Error loading mapping for edit:', error);
+        showAlert('Error loading mapping: ' + error.message, 'error');
+    }
+}
+
+async function updateMapping() {
+    const mappingId = document.getElementById('editMappingId').value;
+    const form = document.getElementById('editMappingForm');
+    const updateButton = document.querySelector('#editMappingModal .btn-primary');
+    
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        form.reportValidity();
+        return;
+    }
+    
+    const mappingData = {
+        sync_direction: document.getElementById('editSyncDirection').value,
+        sync_interval_minutes: parseInt(document.getElementById('editSyncInterval').value),
+        sync_window_days: parseInt(document.getElementById('editSyncWindow').value),
+        webhook_url: document.getElementById('editWebhookUrl').value || null,
+        enabled: document.getElementById('editEnableMapping').checked
+    };
+    
+    try {
+        // Show loading state
+        const originalButtonText = updateButton.innerHTML;
+        updateButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Updating...';
+        updateButton.disabled = true;
+        
+        const response = await fetch(`/api/mappings/${mappingId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(mappingData)
+        });
+        
+        if (response.ok) {
+            showAlert('Calendar mapping updated successfully!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editMappingModal')).hide();
+            form.reset();
+            form.classList.remove('was-validated');
+            loadMappings();
+        } else {
+            const error = await response.json();
+            showAlert(`Failed to update mapping: ${error.detail}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error updating mapping:', error);
+        showAlert('Error updating mapping: ' + error.message, 'error');
+    } finally {
+        // Reset button state
+        updateButton.innerHTML = '<i class="bi bi-check-circle"></i> Update Mapping';
+        updateButton.disabled = false;
+    }
 }
 
 function showAlert(message, type) {
