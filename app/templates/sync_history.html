@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+
+{% block title %}Sync History - CalDAV Sync Microservice{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-clock-history"></i> Sync History</h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-danger" onclick="clearSyncHistory()">
+                    <i class="bi bi-trash"></i> Clear History
+                </button>
+                <button class="btn btn-primary" onclick="triggerManualSync()">
+                    <i class="bi bi-arrow-repeat"></i> Trigger Sync
+                </button>
+                <button class="btn btn-outline-secondary" onclick="refreshSyncHistory()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info Card -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Sync History (Last 7 Days)</strong>
+            <p class="mb-0">
+                This page shows all sync operations from the past 7 days that resulted in changes (insert/update/delete).
+                Empty polling operations are filtered out for clarity. The page auto-refreshes every 30 seconds.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Sync History -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 data-bs-toggle="tooltip"
+                    title="Complete history of sync operations that resulted in actual changes over the last 7 days">
+                    <i class="bi bi-list-ul"></i> Sync Operations History
+                </h5>
+                <div class="d-flex align-items-center gap-3">
+                    <small class="text-muted" id="history-count">Loading...</small>
+                    <div class="spinner-border spinner-border-sm d-none" id="loading-spinner" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="sync-history">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <div id="pagination-container" class="d-none">
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted" id="pagination-info"></small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" id="prev-page" onclick="loadPreviousPage()" disabled>
+                                <i class="bi bi-chevron-left"></i> Previous
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" id="next-page" onclick="loadNextPage()" disabled>
+                                Next <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clear History Confirmation Modal -->
+<div class="modal fade" id="clearHistoryModal" tabindex="-1" aria-labelledby="clearHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clearHistoryModalLabel">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> Clear Sync History
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to clear ALL sync history?</strong></p>
+                <p class="text-muted">
+                    This will permanently delete all sync operation records from the database. 
+                    This action cannot be undone.
+                </p>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Note:</strong> This only clears the history logs. Your calendar synchronization 
+                    settings and event mappings will remain intact and continue working normally.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmClearHistory()">
+                    <i class="bi bi-trash"></i> Clear All History
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Sync History JavaScript
+let currentPage = 0;
+const pageSize = 20;
+let totalCount = 0;
+let isLoading = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSyncHistory();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadSyncHistory, 30000);
+});
+
+async function loadSyncHistory(page = 0) {
+    if (isLoading) return;
+    
+    isLoading = true;
+    showLoadingSpinner(true);
+    
+    try {
+        // Calculate 7 days ago
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const response = await fetch(`/api/sync/history?limit=${pageSize}&offset=${page * pageSize}`);
+        if (!response.ok) throw new Error(`History API error: ${response.status}`);
+        
+        const data = await response.json();
+        
+        // Filter to last 7 days and only meaningful activities
+        const cutoffDate = sevenDaysAgo.getTime();
+        const filteredResults = data.results.filter(activity => {
+            const activityDate = new Date(activity.started_at).getTime();
+            const totalChanges = (activity.inserted_count || 0) + (activity.updated_count || 0) + (activity.deleted_count || 0);
+            return activityDate >= cutoffDate && (totalChanges > 0 || activity.status === 'failure' || activity.status === 'partial_failure');
+        });
+        
+        currentPage = page;
+        totalCount = filteredResults.length;
+        
+        updateSyncHistory(filteredResults);
+        updatePagination(data);
+        updateHistoryCount(filteredResults.length);
+        
+    } catch (error) {
+        console.error('Error loading sync history:', error);
+        document.getElementById('sync-history').innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-exclamation-triangle"></i>
+                <p class="mb-0">Unable to load sync history</p>
+                <small>Please check your connection and try again</small>
+            </div>
+        `;
+    } finally {
+        isLoading = false;
+        showLoadingSpinner(false);
+    }
+}
+
+function updateSyncHistory(activities) {
+    const historyContainer = document.getElementById('sync-history');
+    
+    if (activities.length === 0) {
+        historyContainer.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-info-circle"></i>
+                <p class="mb-1">No sync changes in the last 7 days</p>
+                <small>Only sync operations with actual changes are shown here.<br>
+                Empty polling operations are filtered out for clarity.</small>
+            </div>
+        `;
+        return;
+    }
+    
+    const historyHtml = activities.map(activity => {
+        // Status badge logic
+        let statusBadge, statusIcon, statusText;
+        
+        if (activity.status === 'success') {
+            statusBadge = 'success';
+            statusIcon = 'check-circle-fill';
+            statusText = 'Completed';
+        } else if (activity.status === 'failure') {
+            statusBadge = 'danger';
+            statusIcon = 'x-circle-fill';
+            statusText = 'Failed';
+        } else if (activity.status === 'partial_failure') {
+            statusBadge = 'warning';
+            statusIcon = 'exclamation-triangle-fill';
+            statusText = 'Partial';
+        } else if (activity.status === 'running') {
+            statusBadge = 'primary';
+            statusIcon = 'arrow-repeat';
+            statusText = 'Running';
+        } else {
+            statusBadge = 'secondary';
+            statusIcon = 'question-circle';
+            statusText = activity.status || 'Unknown';
+        }
+        
+        // Format sync direction
+        let directionText;
+        if (activity.caldav_account_name) {
+            directionText = activity.direction === 'caldav_to_google' ? `${activity.caldav_account_name} → Google` :
+                           activity.direction === 'google_to_caldav' ? `Google → ${activity.caldav_account_name}` :
+                           activity.direction === 'bidirectional' ? `${activity.caldav_account_name} ↔ Google` :
+                           activity.direction;
+        } else {
+            directionText = activity.direction === 'caldav_to_google' ? 'CalDAV → Google' :
+                           activity.direction === 'google_to_caldav' ? 'Google → CalDAV' :
+                           activity.direction === 'bidirectional' ? 'Bidirectional' :
+                           activity.direction;
+        }
+        
+        // Calculate total events processed
+        const totalEvents = (activity.inserted_count || 0) + (activity.updated_count || 0) + (activity.deleted_count || 0);
+        
+        // Generate change description
+        let changeDescription = '';
+        if (activity.change_summary) {
+            changeDescription = `<div class="mb-1"><small class="text-primary"><i class="bi bi-calendar-event"></i> ${activity.change_summary}</small></div>`;
+        }
+        
+        // Generate detailed change stats
+        let changeStats = [];
+        if (activity.inserted_count > 0) {
+            changeStats.push(`${activity.inserted_count} insertion${activity.inserted_count > 1 ? 's' : ''}`);
+        }
+        if (activity.updated_count > 0) {
+            changeStats.push(`${activity.updated_count} update${activity.updated_count > 1 ? 's' : ''}`);
+        }
+        if (activity.deleted_count > 0) {
+            changeStats.push(`${activity.deleted_count} deletion${activity.deleted_count > 1 ? 's' : ''}`);
+        }
+        const changeStatsText = changeStats.length > 0 ? changeStats.join(', ') : 'No changes';
+        
+        return `
+            <div class="d-flex justify-content-between align-items-center border-bottom py-3">
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center mb-1">
+                        <span class="badge bg-${statusBadge} me-2" data-bs-toggle="tooltip"
+                              title="Sync ${statusText.toLowerCase()}">
+                            <i class="bi bi-${statusIcon}"></i> ${statusText}
+                        </span>
+                        <small class="text-muted">${directionText}</small>
+                    </div>
+                    ${changeDescription}
+                    <div class="d-flex align-items-center">
+                        <small class="text-muted me-3">
+                            <i class="bi bi-clock"></i> ${new Date(activity.started_at).toLocaleString()}
+                        </small>
+                        ${activity.duration_seconds ?
+                            `<small class="text-muted">
+                                <i class="bi bi-stopwatch"></i> ${activity.duration_seconds.toFixed(1)}s
+                            </small>` : ''
+                        }
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="mb-1">
+                        <span class="badge bg-light text-dark" data-bs-toggle="tooltip"
+                              title="Total events processed: ${totalEvents}">
+                            ${changeStatsText}
+                        </span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        ${activity.inserted_count > 0 ?
+                            `<small class="text-success" data-bs-toggle="tooltip" title="Events inserted">
+                                <i class="bi bi-plus-circle"></i> ${activity.inserted_count}
+                            </small>` : ''
+                        }
+                        ${activity.updated_count > 0 ?
+                            `<small class="text-warning" data-bs-toggle="tooltip" title="Events updated">
+                                <i class="bi bi-pencil-circle"></i> ${activity.updated_count}
+                            </small>` : ''
+                        }
+                        ${activity.deleted_count > 0 ?
+                            `<small class="text-info" data-bs-toggle="tooltip" title="Events deleted">
+                                <i class="bi bi-trash-circle"></i> ${activity.deleted_count}
+                            </small>` : ''
+                        }
+                        ${totalEvents === 0 ?
+                            `<small class="text-muted">No changes</small>` : ''
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    historyContainer.innerHTML = historyHtml;
+    
+    // Initialize tooltips
+    const tooltipTriggerList = historyContainer.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach(tooltipTriggerEl => {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+function updatePagination(data) {
+    const paginationContainer = document.getElementById('pagination-container');
+    const paginationInfo = document.getElementById('pagination-info');
+    const prevButton = document.getElementById('prev-page');
+    const nextButton = document.getElementById('next-page');
+    
+    if (data.total_count > pageSize) {
+        paginationContainer.classList.remove('d-none');
+        
+        const startItem = (currentPage * pageSize) + 1;
+        const endItem = Math.min((currentPage + 1) * pageSize, data.total_count);
+        
+        paginationInfo.textContent = `Showing ${startItem}-${endItem} of ${data.total_count} records`;
+        
+        prevButton.disabled = currentPage === 0;
+        nextButton.disabled = !data.has_more;
+    } else {
+        paginationContainer.classList.add('d-none');
+    }
+}
+
+function updateHistoryCount(count) {
+    const countElement = document.getElementById('history-count');
+    countElement.textContent = `${count} sync operations (last 7 days)`;
+}
+
+function showLoadingSpinner(show) {
+    const spinner = document.getElementById('loading-spinner');
+    if (show) {
+        spinner.classList.remove('d-none');
+    } else {
+        spinner.classList.add('d-none');
+    }
+}
+
+function loadPreviousPage() {
+    if (currentPage > 0) {
+        loadSyncHistory(currentPage - 1);
+    }
+}
+
+function loadNextPage() {
+    loadSyncHistory(currentPage + 1);
+}
+
+function refreshSyncHistory() {
+    loadSyncHistory(currentPage);
+    showAlert('Sync history refreshed', 'info');
+}
+
+// Clear History Functions
+function clearSyncHistory() {
+    const modal = new bootstrap.Modal(document.getElementById('clearHistoryModal'));
+    modal.show();
+}
+
+async function confirmClearHistory() {
+    try {
+        // Close modal first
+        const modal = bootstrap.Modal.getInstance(document.getElementById('clearHistoryModal'));
+        modal.hide();
+        
+        // Show loading state
+        showLoadingSpinner(true);
+        
+        // Clear all history (use days_old=0 to clear everything)
+        const response = await fetch('/api/sync/history?days_old=0', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert(`Cleared ${data.deleted_count} sync history records`, 'success');
+            // Reload the history page
+            loadSyncHistory(0);
+        } else {
+            showAlert(data.detail || 'Failed to clear sync history', 'error');
+        }
+    } catch (error) {
+        console.error('Error clearing sync history:', error);
+        showAlert('Error clearing sync history', 'error');
+    } finally {
+        showLoadingSpinner(false);
+    }
+}
+
+// Trigger Sync Functions (reused from dashboard)
+async function triggerManualSync() {
+    const triggerButton = document.querySelector('button[onclick="triggerManualSync()"]');
+    const originalText = triggerButton.innerHTML;
+    
+    try {
+        // Show loading state
+        triggerButton.disabled = true;
+        triggerButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
+        
+        const response = await fetch('/api/sync/trigger', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert(`Triggered sync for ${data.triggered_count} mappings`, 'success');
+            
+            // Start smart polling if syncs were triggered
+            if (data.triggered_count > 0 && data.triggered_mapping_ids) {
+                await pollForSyncCompletion(data.triggered_mapping_ids);
+            } else {
+                // No syncs triggered, just refresh immediately
+                loadSyncHistory(currentPage);
+            }
+        } else {
+            showAlert(data.detail || 'Failed to trigger sync', 'error');
+        }
+    } catch (error) {
+        console.error('Error triggering sync:', error);
+        showAlert('Error triggering sync', 'error');
+    } finally {
+        // Restore button state
+        triggerButton.disabled = false;
+        triggerButton.innerHTML = originalText;
+    }
+}
+
+// Smart polling for sync completion (reused from dashboard)
+async function pollForSyncCompletion(triggeredMappingIds, maxAttempts = 20) {
+    let attempts = 0;
+    const pollInterval = 500;
+    
+    // Show sync progress indicator
+    showSyncProgressIndicator(triggeredMappingIds.length);
+    
+    const poll = async () => {
+        attempts++;
+        
+        try {
+            const response = await fetch('/api/sync/active');
+            if (!response.ok) {
+                throw new Error(`Polling failed: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const currentActiveSyncs = new Set(data.active_mapping_ids);
+            
+            // Check if any of our triggered syncs are still running
+            const ourActiveSyncs = triggeredMappingIds.filter(id => currentActiveSyncs.has(id));
+            
+            // Update progress indicator
+            updateSyncProgressIndicator(triggeredMappingIds.length - ourActiveSyncs.length, triggeredMappingIds.length);
+            
+            if (ourActiveSyncs.length === 0) {
+                // All our syncs are complete!
+                hideSyncProgressIndicator();
+                loadSyncHistory(currentPage);
+                showAlert('Sync operations completed', 'success');
+                return;
+            }
+            
+            // Continue polling if we haven't exceeded max attempts
+            if (attempts < maxAttempts) {
+                setTimeout(poll, pollInterval);
+            } else {
+                // Fallback: max attempts reached
+                hideSyncProgressIndicator();
+                loadSyncHistory(currentPage);
+                showAlert('Sync polling timeout - history refreshed', 'warning');
+            }
+            
+        } catch (error) {
+            console.error('Polling error:', error);
+            
+            // Fallback on error
+            if (attempts < 3) {
+                setTimeout(poll, pollInterval * 2);
+            } else {
+                hideSyncProgressIndicator();
+                loadSyncHistory(currentPage);
+                showAlert('Sync status polling failed - history refreshed', 'warning');
+            }
+        }
+    };
+    
+    // Start polling after a brief delay
+    setTimeout(poll, 200);
+}
+
+// Progress indicator functions (reused from dashboard)
+function showSyncProgressIndicator(totalSyncs) {
+    const existingIndicator = document.getElementById('sync-progress-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'sync-progress-indicator';
+    indicator.className = 'alert alert-info d-flex align-items-center';
+    indicator.innerHTML = `
+        <div class="spinner-border spinner-border-sm me-3" role="status">
+            <span class="visually-hidden">Syncing...</span>
+        </div>
+        <div>
+            <strong>Sync in progress...</strong>
+            <div class="progress mt-2" style="height: 6px; width: 300px;">
+                <div id="sync-progress-bar" class="progress-bar bg-info" role="progressbar"
+                     style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                </div>
+            </div>
+            <small class="text-muted mt-1 d-block">
+                <span id="sync-progress-text">Starting sync operations...</span>
+            </small>
+        </div>
+        <button type="button" class="btn-close ms-auto" onclick="hideSyncProgressIndicator()"></button>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertAdjacentElement('afterbegin', indicator);
+}
+
+function updateSyncProgressIndicator(completed, total) {
+    const progressBar = document.getElementById('sync-progress-bar');
+    const progressText = document.getElementById('sync-progress-text');
+    
+    if (progressBar && progressText) {
+        const percentage = Math.round((completed / total) * 100);
+        progressBar.style.width = `${percentage}%`;
+        progressBar.setAttribute('aria-valuenow', percentage);
+        
+        if (completed === total) {
+            progressText.textContent = 'Sync operations completed!';
+        } else {
+            progressText.textContent = `${completed} of ${total} sync operations completed`;
+        }
+    }
+}
+
+function hideSyncProgressIndicator() {
+    const indicator = document.getElementById('sync-progress-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
+// Alert function (reused from dashboard)
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

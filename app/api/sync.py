@@ -397,31 +397,48 @@ async def get_sync_stats(
 @router.delete("/history")
 async def cleanup_sync_history(
     request: Request,
-    days_old: int = Query(30, ge=1, le=365, description="Delete sync logs older than this many days"),
+    days_old: int = Query(30, ge=0, le=365, description="Delete sync logs older than this many days (0 = delete all)"),
     db: Session = Depends(get_db),
     _: bool = Depends(require_api_key_unless_localhost),
     __: bool = Depends(check_rate_limit)
 ):
     """Clean up old sync history records."""
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
-        
-        # Count records to be deleted
-        old_logs = db.query(SyncLog).filter(SyncLog.started_at < cutoff_date)
-        count_to_delete = old_logs.count()
-        
-        # Delete old records
-        old_logs.delete()
-        db.commit()
-        
-        logger.info(f"Cleaned up {count_to_delete} sync history records older than {days_old} days")
-        
-        return {
-            "message": f"Deleted {count_to_delete} sync history records",
-            "deleted_count": count_to_delete,
-            "cutoff_date": cutoff_date.isoformat(),
-            "cleaned_at": datetime.utcnow().isoformat()
-        }
+        if days_old == 0:
+            # Delete all sync history records
+            all_logs = db.query(SyncLog)
+            count_to_delete = all_logs.count()
+            all_logs.delete()
+            db.commit()
+            
+            logger.info(f"Cleared all {count_to_delete} sync history records")
+            
+            return {
+                "message": f"Deleted all {count_to_delete} sync history records",
+                "deleted_count": count_to_delete,
+                "cutoff_date": None,
+                "cleaned_at": datetime.utcnow().isoformat()
+            }
+        else:
+            # Delete records older than specified days
+            cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+            
+            # Count records to be deleted
+            old_logs = db.query(SyncLog).filter(SyncLog.started_at < cutoff_date)
+            count_to_delete = old_logs.count()
+            
+            # Delete old records
+            old_logs.delete()
+            db.commit()
+            
+            logger.info(f"Cleaned up {count_to_delete} sync history records older than {days_old} days")
+            
+            return {
+                "message": f"Deleted {count_to_delete} sync history records",
+                "deleted_count": count_to_delete,
+                "cutoff_date": cutoff_date.isoformat(),
+                "cleaned_at": datetime.utcnow().isoformat()
+            }
         
     except Exception as e:
         logger.error(f"Failed to cleanup sync history: {e}")
