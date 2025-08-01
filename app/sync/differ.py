@@ -252,23 +252,45 @@ class EventDiffer:
         
         # Case 1: Only CalDAV event exists
         if caldav_event and not google_event:
-            return EventChange(
-                action=ChangeAction.INSERT,
-                event_uid=event_uid,
-                caldav_event=caldav_event,
-                existing_mapping=mapping,
-                reason="New CalDAV event"
-            )
+            if mapping:
+                # If mapping exists, Google event was deleted - delete from CalDAV
+                return EventChange(
+                    action=ChangeAction.DELETE,
+                    event_uid=event_uid,
+                    caldav_event=caldav_event,
+                    existing_mapping=mapping,
+                    reason="Google event deleted - delete from CalDAV"
+                )
+            else:
+                # No mapping - this is a new CalDAV event to sync to Google
+                return EventChange(
+                    action=ChangeAction.INSERT,
+                    event_uid=event_uid,
+                    caldav_event=caldav_event,
+                    existing_mapping=mapping,
+                    reason="New CalDAV event"
+                )
         
         # Case 2: Only Google event exists
         if google_event and not caldav_event:
-            return EventChange(
-                action=ChangeAction.INSERT,
-                event_uid=event_uid,
-                google_event=google_event,
-                existing_mapping=mapping,
-                reason="New Google event"
-            )
+            if mapping:
+                # If mapping exists, CalDAV event was deleted - delete from Google
+                return EventChange(
+                    action=ChangeAction.DELETE,
+                    event_uid=event_uid,
+                    google_event=google_event,
+                    existing_mapping=mapping,
+                    reason="CalDAV event deleted - delete from Google"
+                )
+            else:
+                # No mapping - this is a new Google event to sync to CalDAV
+                return EventChange(
+                    action=ChangeAction.INSERT,
+                    event_uid=event_uid,
+                    google_event=google_event,
+                    existing_mapping=mapping,
+                    reason="New Google event"
+                )
         
         # Case 3: Both events exist - check for changes and conflicts
         if caldav_event and google_event:
@@ -673,6 +695,10 @@ class EventDiffer:
                 return True
             elif "New Google event" in change.reason:
                 return False  # New Google events should sync TO CalDAV
+            elif "CalDAV event deleted" in change.reason:
+                return True  # Delete from Google when CalDAV event is deleted
+            elif "Google event deleted" in change.reason:
+                return False  # Don't sync to Google when Google event was deleted
             else:
                 # Default behavior for other cases
                 return True
@@ -702,6 +728,10 @@ class EventDiffer:
                 return True
             elif "New CalDAV event" in change.reason:
                 return False  # New CalDAV events should sync TO Google
+            elif "Google event deleted" in change.reason:
+                return True  # Delete from CalDAV when Google event is deleted
+            elif "CalDAV event deleted" in change.reason:
+                return False  # Don't sync to CalDAV when CalDAV event was deleted
             else:
                 # Default behavior for other cases
                 return False
