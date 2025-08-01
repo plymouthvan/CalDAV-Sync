@@ -99,13 +99,32 @@ class CalDAVEvent:
     
     def get_content_hash(self) -> str:
         """Generate a hash of the event content for change detection."""
+        # Normalize datetime objects to UTC for consistent hashing
+        start_str = ""
+        if self.start:
+            if isinstance(self.start, datetime) and self.start.tzinfo:
+                # Convert to UTC for consistent hashing
+                start_utc = self.start.astimezone(pytz.UTC)
+                start_str = start_utc.strftime('%Y-%m-%d %H:%M:%S+00:00')
+            else:
+                start_str = str(self.start)
+        
+        end_str = ""
+        if self.end:
+            if isinstance(self.end, datetime) and self.end.tzinfo:
+                # Convert to UTC for consistent hashing
+                end_utc = self.end.astimezone(pytz.UTC)
+                end_str = end_utc.strftime('%Y-%m-%d %H:%M:%S+00:00')
+            else:
+                end_str = str(self.end)
+        
         content_parts = [
             self.uid or "",  # Ensure consistent handling of None values
             self.summary or "",
             self.description or "",
             self.location or "",
-            str(self.start) if self.start else "",
-            str(self.end) if self.end else "",
+            start_str,
+            end_str,
             str(self.all_day),
             self.timezone or "",
             self.rrule or "",  # This maps to Google's normalized recurrence
