@@ -165,9 +165,23 @@ class GoogleCalendarEvent:
         if self.all_day:
             # All-day events use date format
             if self.start:
-                event_data["start"] = {"date": self.start.date().isoformat()}
+                # DEBUG: Log the type and value of start for all-day events
+                print(f"GOOGLE MODEL DEBUG: all_day start={self.start} (type: {type(self.start)})")
+                if isinstance(self.start, date) and not isinstance(self.start, datetime):
+                    # Already a date object
+                    event_data["start"] = {"date": self.start.isoformat()}
+                else:
+                    # datetime object, extract date
+                    event_data["start"] = {"date": self.start.date().isoformat()}
             if self.end:
-                event_data["end"] = {"date": self.end.date().isoformat()}
+                # DEBUG: Log the type and value of end for all-day events
+                print(f"GOOGLE MODEL DEBUG: all_day end={self.end} (type: {type(self.end)})")
+                if isinstance(self.end, date) and not isinstance(self.end, datetime):
+                    # Already a date object
+                    event_data["end"] = {"date": self.end.isoformat()}
+                else:
+                    # datetime object, extract date
+                    event_data["end"] = {"date": self.end.date().isoformat()}
         else:
             # Timed events use dateTime format
             if self.start:
