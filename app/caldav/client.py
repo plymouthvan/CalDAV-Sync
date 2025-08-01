@@ -362,6 +362,8 @@ class CalDAVClient:
             # DIAGNOSTIC: Try different search approaches for iCloud compatibility (same as update_event)
             self.logger.info(f"CALDAV DELETE DEBUG: Attempting to find event {event_uid}")
             
+            existing_event = None
+            
             # Try method 1: Direct UID search (current approach)
             try:
                 existing_events = calendar.search(uid=event_uid)
@@ -370,12 +372,16 @@ class CalDAVClient:
                     existing_event = existing_events[0]
                     self.logger.info(f"CALDAV DELETE DEBUG: Found event via UID search")
                 else:
-                    self.logger.warning(f"Event {event_uid} not found for deletion via UID search")
-                    return True  # Already deleted
+                    self.logger.info(f"CALDAV DELETE DEBUG: UID search returned no events")
             except Exception as search_error:
                 self.logger.error(f"CALDAV DELETE DEBUG: UID search failed: {type(search_error).__name__}: {search_error}")
                 
-                # Try method 2: Get all events and filter by UID
+                # For 412 errors, this might be a server compatibility issue
+                if "412" in str(search_error):
+                    self.logger.error(f"CALDAV DELETE DEBUG: 412 Precondition Failed - likely server compatibility issue")
+            
+            # Try method 2: Get all events and filter by UID (if method 1 failed or found nothing)
+            if not existing_event:
                 try:
                     self.logger.info(f"CALDAV DELETE DEBUG: Trying alternative search method")
                     from datetime import datetime, timedelta
@@ -393,7 +399,6 @@ class CalDAVClient:
                     self.logger.info(f"CALDAV DELETE DEBUG: Date search returned {len(all_events)} events")
                     
                     # Find our event by UID
-                    existing_event = None
                     for cal_event in all_events:
                         try:
                             ical_data = cal_event.data
@@ -408,25 +413,64 @@ class CalDAVClient:
                         except Exception as parse_error:
                             self.logger.warning(f"CALDAV DELETE DEBUG: Failed to parse event during search: {parse_error}")
                             continue
-                    
-                    if not existing_event:
-                        self.logger.warning(f"Event {event_uid} not found for deletion via alternative search")
-                        return True  # Already deleted
-                        
+                            
                 except Exception as alt_search_error:
                     self.logger.error(f"CALDAV DELETE DEBUG: Alternative search failed: {type(alt_search_error).__name__}: {alt_search_error}")
-                    self.logger.warning(f"Event {event_uid} not found for deletion via any search method")
-                    return True  # Assume already deleted
             
-            # Delete the event
-            existing_event.delete()
+            # If we still haven't found the event, it might already be deleted
+            if not existing_event:
+                self.logger.warning(f"CALDAV DELETE DEBUG: Event {event_uid} not found via any search method - may already be deleted")
+                # CRITICAL FIX: Don't assume success if we can't find the event
+                # Instead, let's verify by doing a fresh search to confirm it's really gone
+                try:
+                    # Do a final verification search to confirm the event is truly gone
+                    verification_events = self.get_events_by_sync_window(calendar_id, 30)
+                    event_still_exists = any(e.uid == event_uid for e in verification_events)
+                    
+                    if event_still_exists:
+                        self.logger.error(f"CALDAV DELETE DEBUG: Event {event_uid} still exists after failed deletion attempts")
+                        raise CalDAVEventError(f"Event {event_uid} could not be deleted - still exists in calendar")
+                    else:
+                        self.logger.info(f"CALDAV DELETE DEBUG: Verified event {event_uid} is not in calendar - deletion successful or already deleted")
+                        return True
+                        
+                except Exception as verify_error:
+                    self.logger.error(f"CALDAV DELETE DEBUG: Verification search failed: {verify_error}")
+                    # If we can't verify, assume the worst and report failure
+                    raise CalDAVEventError(f"Event {event_uid} deletion status unclear - verification failed: {verify_error}")
             
-            self.logger.info(f"Deleted event {event_uid} from calendar {calendar_id}")
-            return True
+            # If we found the event, delete it
+            try:
+                existing_event.delete()
+                self.logger.info(f"CALDAV DELETE DEBUG: Successfully called delete() on event {event_uid}")
+                
+                # Verify the deletion worked
+                try:
+                    verification_events = self.get_events_by_sync_window(calendar_id, 30)
+                    event_still_exists = any(e.uid == event_uid for e in verification_events)
+                    
+                    if event_still_exists:
+                        self.logger.error(f"CALDAV DELETE DEBUG: Event {event_uid} still exists after delete() call")
+                        raise CalDAVEventError(f"Event {event_uid} deletion failed - event still exists after delete()")
+                    else:
+                        self.logger.info(f"CALDAV DELETE DEBUG: Verified event {event_uid} was successfully deleted")
+                        return True
+                        
+                except Exception as verify_error:
+                    self.logger.warning(f"CALDAV DELETE DEBUG: Could not verify deletion: {verify_error}")
+                    # If we can't verify but the delete() call succeeded, assume success
+                    return True
+                    
+            except Exception as delete_error:
+                self.logger.error(f"CALDAV DELETE DEBUG: delete() call failed: {type(delete_error).__name__}: {delete_error}")
+                raise CalDAVEventError(f"Failed to delete event {event_uid}: {delete_error}")
             
+        except CalDAVEventError:
+            # Re-raise CalDAVEventError as-is
+            raise
         except Exception as e:
-            self.logger.error(f"Failed to delete event {event_uid}: {e}")
-            raise CalDAVEventError(f"Failed to delete event: {e}")
+            self.logger.error(f"CALDAV DELETE DEBUG: Unexpected error during deletion: {type(e).__name__}: {e}")
+            raise CalDAVEventError(f"Failed to delete event {event_uid}: {e}")
     
     def _event_to_ical(self, event: CalDAVEvent) -> str:
         """Convert a CalDAVEvent to iCal format."""
@@ -474,7 +518,7 @@ class CalDAVClient:
             return cal.to_ical().decode('utf-8')
             
         except Exception as e:
-            raise EventNormalizationError(f"Failed to convert event to iCal: {e}")
+            raise CalDAVEventError(f"Failed to convert event to iCal: {e}")
 
 
 class CalDAVClientFactory:
