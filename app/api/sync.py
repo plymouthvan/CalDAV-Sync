@@ -181,16 +181,16 @@ async def get_sync_history(
 ):
     """Get sync history with optional filtering."""
     try:
-        from app.database import DBCalDAVAccount
+        from app.database import CalDAVAccount
         
         # Join sync logs with calendar mappings and CalDAV accounts to get account names
         query = db.query(
             SyncLog,
-            DBCalDAVAccount.name.label('caldav_account_name')
+            CalDAVAccount.name.label('caldav_account_name')
         ).join(
             CalendarMapping, SyncLog.mapping_id == CalendarMapping.id
         ).join(
-            DBCalDAVAccount, CalendarMapping.caldav_account_id == DBCalDAVAccount.id
+            CalDAVAccount, CalendarMapping.caldav_account_id == CalDAVAccount.id
         )
         
         if mapping_id:

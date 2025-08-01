@@ -9,7 +9,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 
-from app.database import get_db, CalendarMapping, CalDAVAccount as DBCalDAVAccount
+from app.database import get_db, CalendarMapping, CalDAVAccount
 from app.sync.scheduler import get_sync_scheduler
 from app.api.models import (
     CalendarMappingCreate, CalendarMappingUpdate, CalendarMappingResponse,
@@ -36,8 +36,8 @@ async def list_calendar_mappings(
     """List all calendar mappings with optional filtering."""
     try:
         # Join with CalDAV accounts to get account names
-        query = db.query(CalendarMapping, DBCalDAVAccount.name.label('caldav_account_name')).join(
-            DBCalDAVAccount, CalendarMapping.caldav_account_id == DBCalDAVAccount.id
+        query = db.query(CalendarMapping, CalDAVAccount.name.label('caldav_account_name')).join(
+            CalDAVAccount, CalendarMapping.caldav_account_id == CalDAVAccount.id
         )
         
         if enabled is not None:
@@ -89,8 +89,8 @@ async def create_calendar_mapping(
     """Create a new calendar mapping."""
     try:
         # Verify CalDAV account exists
-        caldav_account = db.query(DBCalDAVAccount).filter(
-            DBCalDAVAccount.id == mapping_data.caldav_account_id
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping_data.caldav_account_id
         ).first()
         
         if not caldav_account:
@@ -317,8 +317,8 @@ async def enable_calendar_mapping(
             return CalendarMappingResponse.from_orm(mapping)
         
         # Verify CalDAV account is enabled
-        caldav_account = db.query(DBCalDAVAccount).filter(
-            DBCalDAVAccount.id == mapping.caldav_account_id
+        caldav_account = db.query(CalDAVAccount).filter(
+            CalDAVAccount.id == mapping.caldav_account_id
         ).first()
         
         if not caldav_account or not caldav_account.enabled:
