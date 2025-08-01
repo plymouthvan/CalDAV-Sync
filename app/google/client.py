@@ -319,7 +319,31 @@ class GoogleCalendarClient:
             
             service = self._get_service()
             
+            # SEQUENCE NUMBER FIX: Fetch the latest version of the event to get current sequence number
+            self.logger.info(f"UPDATE EVENT DEBUG: Fetching latest version of event {event.id} to get current sequence number")
+            
+            try:
+                get_request = service.events().get(
+                    calendarId=calendar_id,
+                    eventId=event.id
+                )
+                latest_event_data = self._execute_with_retry(get_request)
+                latest_sequence = latest_event_data.get('sequence', 0)
+                
+                self.logger.info(f"UPDATE EVENT DEBUG: Current sequence number is {latest_sequence}")
+                
+                # Update our event with the latest sequence number
+                event.sequence = latest_sequence
+                
+            except HttpError as get_e:
+                if get_e.resp.status == 404:
+                    raise GoogleCalendarEventError(f"Event {event.id} not found for update")
+                else:
+                    self.logger.warning(f"UPDATE EVENT DEBUG: Failed to fetch latest event data: {get_e}, proceeding without sequence update")
+            
             event_data = event.to_google_api_format()
+            
+            self.logger.info(f"UPDATE EVENT DEBUG: Updating event {event.id} with sequence number {event.sequence}")
             
             request = service.events().update(
                 calendarId=calendar_id,
