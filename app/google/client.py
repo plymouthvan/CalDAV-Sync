@@ -72,6 +72,10 @@ class GoogleCalendarClient:
                         continue
                     else:
                         raise GoogleRateLimitError(f"Rate limit exceeded after {max_retries} attempts", retry_after)
+                elif e.resp.status == 410:
+                    # Handle 410 "Resource has been deleted" - don't convert to exception, let caller handle
+                    self.logger.info(f"EXECUTE_WITH_RETRY DEBUG: Got 410 error, re-raising as HttpError for caller to handle")
+                    raise e  # Re-raise the original HttpError so delete_event can handle it properly
                 else:
                     raise handle_google_exception(e)
             
