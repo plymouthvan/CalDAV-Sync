@@ -14,6 +14,7 @@ The sync process is efficient, fault-tolerant, and resilient to restarts. It use
 - 🧠 Smart diffing to avoid unnecessary Google API calls
 - 🔐 OAuth2 support for Google Calendar with token persistence
 - ⚙️ Configuration via minimal, browser-based web UI
+- 📊 Enhanced sync display with event titles and detailed change summaries
 - 🐳 Fully dockerized, deployable via Docker Compose
 - 🌐 Compatible with reverse proxy setups (e.g. NGINX or Traefik)
 

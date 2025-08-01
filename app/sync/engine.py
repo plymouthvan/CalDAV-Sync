@@ -44,9 +44,15 @@ class SyncResult:
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None
     
+    # Enhanced sync details for richer UI display
+    event_summaries: List[str] = None  # List of event titles that changed
+    change_summary: Optional[str] = None  # Human-readable summary
+    
     def __post_init__(self):
         if self.errors is None:
             self.errors = []
+        if self.event_summaries is None:
+            self.event_summaries = []
 
 
 class SyncEngine:
@@ -124,6 +130,9 @@ class SyncEngine:
             logger.info(f"SYNC ENGINE DATETIME DEBUG: completed_at={result.completed_at} (tzinfo: {result.completed_at.tzinfo})")
             result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
             
+            # Generate human-readable change summary
+            result.change_summary = self._generate_change_summary(result)
+            
             logger.log_sync_complete(
                 result.inserted_count,
                 result.updated_count,
@@ -156,6 +165,12 @@ class SyncEngine:
                     db_sync_log.error_message = "; ".join(result.errors) if result.errors else None
                     db_sync_log.completed_at = result.completed_at
                     db_sync_log.duration_seconds = int(result.duration_seconds) if result.duration_seconds else None
+                    
+                    # Store enhanced sync details
+                    if result.event_summaries:
+                        import json
+                        db_sync_log.event_summaries = json.dumps(result.event_summaries)
+                    db_sync_log.change_summary = result.change_summary
                 
                 # Re-fetch the mapping to ensure it's attached to this session
                 db_mapping = db.query(CalendarMapping).filter(CalendarMapping.id == mapping.id).first()
@@ -343,6 +358,9 @@ class SyncEngine:
                         )
                         
                         result.inserted_count += 1
+                        # Capture event title for summary
+                        if change.caldav_event.summary:
+                            result.event_summaries.append(change.caldav_event.summary)
                         logger.log_event_change("inserted", change.caldav_event.uid, change.caldav_event.summary)
                 
                 elif change.action == ChangeAction.UPDATE:
@@ -362,6 +380,9 @@ class SyncEngine:
                         )
                         
                         result.updated_count += 1
+                        # Capture event title for summary
+                        if change.caldav_event.summary:
+                            result.event_summaries.append(change.caldav_event.summary)
                         logger.log_event_change("updated", change.caldav_event.uid, change.caldav_event.summary)
                 
                 elif change.action == ChangeAction.DELETE:
@@ -373,6 +394,8 @@ class SyncEngine:
                         await self._delete_event_mapping(change.existing_mapping.id)
                         
                         result.deleted_count += 1
+                        # For deletions, we might not have the event title, so use a placeholder
+                        result.event_summaries.append("(Deleted event)")
                         logger.log_event_change("deleted", change.event_uid)
             
             except Exception as e:
@@ -400,6 +423,9 @@ class SyncEngine:
                         )
                         
                         result.inserted_count += 1
+                        # Capture event title for summary
+                        if change.google_event.summary:
+                            result.event_summaries.append(change.google_event.summary)
                         logger.log_event_change("inserted", caldav_event.uid, caldav_event.summary)
                 
                 elif change.action == ChangeAction.UPDATE:
@@ -418,6 +444,9 @@ class SyncEngine:
                         )
                         
                         result.updated_count += 1
+                        # Capture event title for summary
+                        if change.google_event.summary:
+                            result.event_summaries.append(change.google_event.summary)
                         logger.log_event_change("updated", caldav_event.uid, caldav_event.summary)
                 
                 elif change.action == ChangeAction.DELETE:
@@ -429,6 +458,8 @@ class SyncEngine:
                         await self._delete_event_mapping(change.existing_mapping.id)
                         
                         result.deleted_count += 1
+                        # For deletions, we might not have the event title, so use a placeholder
+                        result.event_summaries.append("(Deleted event)")
                         logger.log_event_change("deleted", change.event_uid)
             
             except Exception as e:
@@ -455,6 +486,9 @@ class SyncEngine:
                         )
                         
                         result.updated_count += 1
+                        # Capture event title for summary
+                        if conflict.caldav_event.summary:
+                            result.event_summaries.append(conflict.caldav_event.summary)
                         logger.log_event_change("conflict_resolved_caldav_wins", conflict.caldav_event.uid, conflict.caldav_event.summary)
                 
                 elif conflict.conflict_resolution == ConflictResolution.GOOGLE_WINS:
@@ -471,12 +505,33 @@ class SyncEngine:
                         )
                         
                         result.updated_count += 1
+                        # Capture event title for summary
+                        if conflict.google_event.summary:
+                            result.event_summaries.append(conflict.google_event.summary)
                         logger.log_event_change("conflict_resolved_google_wins", caldav_event.uid, caldav_event.summary)
             
             except Exception as e:
                 result.error_count += 1
                 result.errors.append(f"Failed to resolve conflict for {conflict.event_uid}: {str(e)}")
                 logger.error(f"Failed to resolve conflict for {conflict.event_uid}: {e}")
+    
+    def _generate_change_summary(self, result: SyncResult) -> str:
+        """Generate a human-readable summary of sync changes."""
+        if not result.event_summaries:
+            return None
+        
+        # Limit the number of event titles shown to avoid overly long summaries
+        max_titles = 3
+        event_titles = result.event_summaries[:max_titles]
+        
+        # Create the summary text
+        if len(result.event_summaries) <= max_titles:
+            summary = f"Synced: {', '.join(event_titles)}"
+        else:
+            remaining = len(result.event_summaries) - max_titles
+            summary = f"Synced: {', '.join(event_titles)} and {remaining} more"
+        
+        return summary
     
     async def _update_event_mapping(self, mapping_id: str, caldav_uid: str, google_event_id: str,
                                   caldav_modified: Optional[datetime], google_updated: Optional[datetime],

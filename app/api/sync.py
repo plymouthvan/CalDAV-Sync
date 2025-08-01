@@ -191,6 +191,15 @@ async def get_sync_history(
         
         results = []
         for log in sync_logs:
+            # Parse event summaries from JSON if available
+            event_summaries = None
+            if log.event_summaries:
+                try:
+                    import json
+                    event_summaries = json.loads(log.event_summaries)
+                except (json.JSONDecodeError, TypeError):
+                    event_summaries = None
+            
             results.append(SyncResultResponse(
                 mapping_id=log.mapping_id,
                 direction=SyncDirection(log.direction),
@@ -202,7 +211,9 @@ async def get_sync_history(
                 errors=log.error_message.split("; ") if log.error_message else [],
                 started_at=log.started_at,
                 completed_at=log.completed_at,
-                duration_seconds=float(log.duration_seconds) if log.duration_seconds else None
+                duration_seconds=float(log.duration_seconds) if log.duration_seconds else None,
+                event_summaries=event_summaries,
+                change_summary=log.change_summary
             ))
         
         return {
@@ -238,6 +249,15 @@ async def get_sync_details(
             CalendarMapping.id == sync_log.mapping_id
         ).first()
         
+        # Parse event summaries from JSON if available
+        event_summaries = None
+        if sync_log.event_summaries:
+            try:
+                import json
+                event_summaries = json.loads(sync_log.event_summaries)
+            except (json.JSONDecodeError, TypeError):
+                event_summaries = None
+        
         return {
             "sync_log": SyncResultResponse(
                 mapping_id=sync_log.mapping_id,
@@ -250,7 +270,9 @@ async def get_sync_details(
                 errors=sync_log.error_message.split("; ") if sync_log.error_message else [],
                 started_at=sync_log.started_at,
                 completed_at=sync_log.completed_at,
-                duration_seconds=float(sync_log.duration_seconds) if sync_log.duration_seconds else None
+                duration_seconds=float(sync_log.duration_seconds) if sync_log.duration_seconds else None,
+                event_summaries=event_summaries,
+                change_summary=sync_log.change_summary
             ),
             "mapping": {
                 "id": mapping.id,

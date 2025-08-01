@@ -166,6 +166,10 @@ class SyncLog(Base):
     completed_at = Column(DateTime, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
     
+    # Enhanced sync details for richer UI display
+    event_summaries = Column(Text, nullable=True)  # JSON array of event titles that changed
+    change_summary = Column(Text, nullable=True)   # Human-readable summary like "2 meetings, 1 appointment"
+    
     # Relationships
     calendar_mapping = relationship("CalendarMapping", back_populates="sync_logs")
     
@@ -217,7 +221,7 @@ class DatabaseManager:
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
     
     def create_tables(self):
-        """Create all database tables."""
+        """Create all database tables and apply schema migrations."""
         try:
             from app.utils.logging import get_logger
             import os
@@ -277,12 +281,53 @@ class DatabaseManager:
             Base.metadata.create_all(bind=self.engine)
             logger.info("Database tables created successfully")
             
+            # Apply schema migrations for existing databases
+            self._apply_schema_migrations()
+            
         except Exception as e:
             from app.utils.logging import get_logger
             logger = get_logger("database")
             logger.error(f"Failed to create database tables: {type(e).__name__}: {e}")
             logger.error(f"Database URL: {self.database_url}")
             raise
+    
+    def _apply_schema_migrations(self):
+        """Apply any pending schema migrations."""
+        try:
+            from app.utils.logging import get_logger
+            from sqlalchemy import text
+            logger = get_logger("database")
+            
+            with self.engine.connect() as conn:
+                # Check if sync_logs table exists and get its columns
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='sync_logs'"))
+                if result.fetchone():
+                    # Get current columns in sync_logs table
+                    result = conn.execute(text("PRAGMA table_info(sync_logs)"))
+                    columns = [row[1] for row in result.fetchall()]
+                    
+                    migrations_applied = []
+                    
+                    # Add event_summaries column if missing
+                    if 'event_summaries' not in columns:
+                        conn.execute(text("ALTER TABLE sync_logs ADD COLUMN event_summaries TEXT"))
+                        migrations_applied.append("event_summaries")
+                    
+                    # Add change_summary column if missing
+                    if 'change_summary' not in columns:
+                        conn.execute(text("ALTER TABLE sync_logs ADD COLUMN change_summary TEXT"))
+                        migrations_applied.append("change_summary")
+                    
+                    if migrations_applied:
+                        conn.commit()
+                        logger.info(f"✓ Applied schema migrations: {', '.join(migrations_applied)}")
+                    else:
+                        logger.info("✓ Database schema is up to date")
+                        
+        except Exception as e:
+            from app.utils.logging import get_logger
+            logger = get_logger("database")
+            logger.warning(f"Schema migration failed (non-critical): {e}")
     
     def get_session(self) -> Session:
         """Get a database session."""

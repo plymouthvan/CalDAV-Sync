@@ -191,6 +191,10 @@ class SyncResultResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime]
     duration_seconds: Optional[float]
+    
+    # Enhanced sync details for richer UI display
+    event_summaries: Optional[List[str]] = None  # List of event titles that changed
+    change_summary: Optional[str] = None         # Human-readable summary
 
 
 class SyncStatusResponse(BaseModel):
