@@ -383,13 +383,48 @@ class EventDiffer:
                 content_differs = caldav_hash != google_hash
                 self.logger.info(f"  content_differs: {content_differs}")
                 
-                # If content differs, we need to determine which side to update
-                # For bidirectional sync, this is ambiguous, so we skip updates
-                # unless we have timestamp information to guide us
+                # If content differs and we have no mapping hash, we need to determine
+                # which side should be considered as having changes based on timestamps
                 if content_differs:
-                    self.logger.info(f"  Content differs but no mapping hash available - skipping update to avoid ambiguity")
-                caldav_has_changes = False
-                google_has_changes = False
+                    self.logger.info(f"  Content differs with no mapping hash - using timestamp-based change detection")
+                    
+                    # Use timestamp comparison to determine which side has changes
+                    # This handles the case where we have events but no previous sync state
+                    if caldav_modified and google_modified:
+                        # Both have timestamps - the more recent one has changes
+                        if caldav_modified > google_modified:
+                            caldav_has_changes = True
+                            google_has_changes = False
+                            self.logger.info(f"  CalDAV newer ({caldav_modified} > {google_modified}) - CalDAV has changes")
+                        elif google_modified > caldav_modified:
+                            caldav_has_changes = False
+                            google_has_changes = True
+                            self.logger.info(f"  Google newer ({google_modified} > {caldav_modified}) - Google has changes")
+                        else:
+                            # Equal timestamps - treat as CalDAV having changes (CalDAV wins ties)
+                            caldav_has_changes = True
+                            google_has_changes = False
+                            self.logger.info(f"  Equal timestamps ({caldav_modified} = {google_modified}) - CalDAV wins")
+                    elif caldav_modified:
+                        # Only CalDAV has timestamp
+                        caldav_has_changes = True
+                        google_has_changes = False
+                        self.logger.info(f"  Only CalDAV has timestamp ({caldav_modified}) - CalDAV has changes")
+                    elif google_modified:
+                        # Only Google has timestamp
+                        caldav_has_changes = False
+                        google_has_changes = True
+                        self.logger.info(f"  Only Google has timestamp ({google_modified}) - Google has changes")
+                    else:
+                        # No timestamps available - default to CalDAV having changes
+                        caldav_has_changes = True
+                        google_has_changes = False
+                        self.logger.info(f"  No timestamps available - defaulting to CalDAV has changes")
+                else:
+                    # Content is identical
+                    caldav_has_changes = False
+                    google_has_changes = False
+                    self.logger.info(f"  Content identical - no changes")
         
         # No changes detected
         if not caldav_has_changes and not google_has_changes:
