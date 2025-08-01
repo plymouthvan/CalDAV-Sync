@@ -336,11 +336,33 @@ class EventDiffer:
             google_hash = google_event.get_content_hash()
             mapping_hash = mapping.event_hash if mapping else None
             
+            # Add diagnostic logging for content hash comparison
+            self.logger.info(f"CONTENT HASH DEBUG for UID {caldav_event.uid}:")
+            self.logger.info(f"  caldav_hash: {caldav_hash}")
+            self.logger.info(f"  google_hash: {google_hash}")
+            self.logger.info(f"  mapping_hash: {mapping_hash}")
+            
             if mapping_hash:
-                caldav_has_changes = caldav_hash != mapping_hash
-                google_has_changes = google_hash != mapping_hash
+                caldav_content_changed = caldav_hash != mapping_hash
+                google_content_changed = google_hash != mapping_hash
+                self.logger.info(f"  caldav_content_changed: {caldav_content_changed}")
+                self.logger.info(f"  google_content_changed: {google_content_changed}")
+                
+                # Only set changes if content actually differs from last sync
+                caldav_has_changes = caldav_content_changed
+                google_has_changes = google_content_changed
             else:
-                caldav_has_changes = caldav_hash != google_hash
+                # If no mapping hash, compare events directly
+                content_differs = caldav_hash != google_hash
+                self.logger.info(f"  content_differs: {content_differs}")
+                
+                # If content differs, we need to determine which side to update
+                # For bidirectional sync, this is ambiguous, so we skip updates
+                # unless we have timestamp information to guide us
+                if content_differs:
+                    self.logger.info(f"  Content differs but no mapping hash available - skipping update to avoid ambiguity")
+                caldav_has_changes = False
+                google_has_changes = False
         
         # No changes detected
         if not caldav_has_changes and not google_has_changes:
