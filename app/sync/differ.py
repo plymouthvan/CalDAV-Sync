@@ -498,12 +498,19 @@ class EventDiffer:
         """Analyze change for Google to CalDAV sync."""
         
         if not caldav_event:
+            # ARCHITECTURAL FIX: If mapping exists but CalDAV event doesn't, it's still an INSERT
+            # This handles the case where the mapping exists but the actual CalDAV event was deleted
+            reason = "New Google event to sync to CalDAV"
+            if mapping:
+                reason = "Google event exists but CalDAV event missing (orphaned mapping) - inserting"
+                self.logger.warning(f"Orphaned mapping detected for UID {google_event.uid or google_event.id}: mapping exists but CalDAV event missing")
+            
             return EventChange(
                 action=ChangeAction.INSERT,
                 event_uid=google_event.uid or google_event.id,
                 google_event=google_event,
                 existing_mapping=mapping,
-                reason="New Google event to sync to CalDAV"
+                reason=reason
             )
         
         # Check if Google event has been modified

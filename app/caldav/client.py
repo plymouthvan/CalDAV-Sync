@@ -210,21 +210,6 @@ class CalDAVClient:
             
             for event in events:
                 try:
-                    # COMPREHENSIVE DIAGNOSTIC: Log all available information during fetch
-                    self.logger.info(f"ETAG FETCH DEBUG: Processing event {event.url}")
-                    self.logger.info(f"ETAG FETCH DEBUG: Event object type: {type(event)}")
-                    
-                    # Check for ETag in various possible attributes
-                    etag_attrs = ['etag', 'ETag', '_etag', 'headers', 'response_headers', 'props', 'properties']
-                    for attr in etag_attrs:
-                        if hasattr(event, attr):
-                            value = getattr(event, attr)
-                            self.logger.info(f"ETAG FETCH DEBUG: {attr} = {value}")
-                    
-                    # Log all attributes that might contain ETag info
-                    all_attrs = [attr for attr in dir(event) if not attr.startswith('__')]
-                    self.logger.info(f"ETAG FETCH DEBUG: All event attributes: {all_attrs}")
-                    
                     # Get the event data
                     ical_data = event.data
                     
@@ -248,8 +233,6 @@ class CalDAVClient:
     
     def get_events_by_sync_window(self, calendar_id: str, sync_window_days: int) -> List[CalDAVEvent]:
         """Fetch events from a calendar using the sync window configuration."""
-        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: Starting get_events_by_sync_window for calendar {calendar_id}")
-        
         start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date + timedelta(days=sync_window_days)
         
@@ -261,9 +244,7 @@ class CalDAVClient:
         
         self.logger.info(f"CALDAV DATETIME DEBUG: start_date={start_date} (tzinfo: {start_date.tzinfo}), end_date={end_date} (tzinfo: {end_date.tzinfo})")
         
-        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: About to call get_events")
         events = self.get_events(calendar_id, start_date, end_date)
-        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: get_events returned {len(events)} events")
         
         # Log datetime info for fetched events
         for event in events:
@@ -272,7 +253,6 @@ class CalDAVClient:
             self.logger.info(f"  end: {event.end} (type: {type(event.end)}, tzinfo: {getattr(event.end, 'tzinfo', None)})")
             self.logger.info(f"  last_modified: {event.last_modified} (type: {type(event.last_modified)}, tzinfo: {getattr(event.last_modified, 'tzinfo', None)})")
         
-        self.logger.info(f"CALDAV SYNC WINDOW DEBUG: Returning {len(events)} events")
         return events
     
     def create_event(self, calendar_id: str, event: CalDAVEvent) -> bool:
@@ -297,74 +277,29 @@ class CalDAVClient:
     
     def update_event(self, calendar_id: str, event: CalDAVEvent) -> bool:
         """Update an existing event in the specified calendar."""
-        print(f"CALDAV UPDATE DEBUG: update_event called for {event.uid}")
-        self.logger.info(f"CALDAV UPDATE DEBUG: update_event called for {event.uid}")
-        
         try:
-            print(f"CALDAV UPDATE DEBUG: Getting calendar {calendar_id}")
             calendar = self.get_calendar_by_id(calendar_id)
             if not calendar:
-                print(f"CALDAV UPDATE DEBUG: Calendar {calendar_id} not found")
                 raise CalDAVCalendarNotFoundError(f"Calendar {calendar_id} not found")
             
-            print(f"CALDAV UPDATE DEBUG: Searching for event {event.uid}")
             # Find the existing event by UID
-            try:
-                existing_events = calendar.search(uid=event.uid)
-                print(f"CALDAV UPDATE DEBUG: Search completed, found {len(existing_events)} events")
-            except Exception as search_error:
-                print(f"CALDAV UPDATE DEBUG: Search failed with error: {type(search_error).__name__}: {search_error}")
-                # If search fails with 412, the event might not exist - try to create it instead
-                if "412" in str(search_error):
-                    print(f"CALDAV UPDATE DEBUG: 412 error during search, attempting to create event instead")
-                    return self.create_event(calendar_id, event)
-                else:
-                    raise search_error
-            
+            existing_events = calendar.search(uid=event.uid)
             if not existing_events:
-                print(f"CALDAV UPDATE DEBUG: Event {event.uid} not found for update, creating instead")
-                return self.create_event(calendar_id, event)
+                raise CalDAVEventError(f"Event {event.uid} not found for update")
             
-            print(f"CALDAV UPDATE DEBUG: Found {len(existing_events)} existing events")
             existing_event = existing_events[0]
-            
-            # COMPREHENSIVE DIAGNOSTIC: Log all available information
-            print(f"CALDAV UPDATE DEBUG: About to update event {event.uid}")
-            print(f"CALDAV UPDATE DEBUG: Event object type: {type(existing_event)}")
-            
-            self.logger.info(f"ETAG DEBUG: About to update event {event.uid}")
-            self.logger.info(f"ETAG DEBUG: Event object type: {type(existing_event)}")
-            self.logger.info(f"ETAG DEBUG: Event object dir: {dir(existing_event)}")
-            
-            # Check for ETag in various possible attributes
-            etag_attrs = ['etag', 'ETag', '_etag', 'headers', 'response_headers']
-            for attr in etag_attrs:
-                if hasattr(existing_event, attr):
-                    value = getattr(existing_event, attr)
-                    print(f"CALDAV UPDATE DEBUG: {attr} = {value}")
-                    self.logger.info(f"ETAG DEBUG: {attr} = {value}")
-            
-            # Check if there's a way to get headers from the caldav library
-            if hasattr(existing_event, 'client') and hasattr(existing_event.client, 'session'):
-                self.logger.info(f"ETAG DEBUG: Client session available: {existing_event.client.session}")
             
             # Convert CalDAVEvent to iCal format
             ical_data = self._event_to_ical(event)
-            print(f"CALDAV UPDATE DEBUG: Generated iCal data length: {len(ical_data)}")
-            self.logger.info(f"ETAG DEBUG: Generated iCal data length: {len(ical_data)}")
             
             # Update the event
-            print(f"CALDAV UPDATE DEBUG: Calling existing_event.save() without ETag headers")
-            self.logger.info(f"ETAG DEBUG: Calling existing_event.save() without ETag headers")
             existing_event.data = ical_data
             existing_event.save()
-            print(f"CALDAV UPDATE DEBUG: existing_event.save() completed")
             
             self.logger.info(f"Updated event {event.uid} in calendar {calendar_id}")
             return True
             
         except Exception as e:
-            print(f"CALDAV UPDATE DEBUG: Exception caught in update_event: {type(e).__name__}: {e}")
             self.logger.error(f"Failed to update event {event.uid}: {e}")
             raise CalDAVEventError(f"Failed to update event: {e}")
     
