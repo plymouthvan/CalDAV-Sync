@@ -709,7 +709,14 @@ function updateMappingsOverview(mappings) {
 }
 
 async function triggerManualSync() {
+    const triggerButton = document.querySelector('button[onclick="triggerManualSync()"]');
+    const originalText = triggerButton.innerHTML;
+    
     try {
+        // Show loading state
+        triggerButton.disabled = true;
+        triggerButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Syncing...';
+        
         const response = await fetch('/api/sync/trigger', {
             method: 'POST',
             headers: {
@@ -722,13 +729,154 @@ async function triggerManualSync() {
         
         if (response.ok) {
             showAlert(`Triggered sync for ${data.triggered_count} mappings`, 'success');
-            setTimeout(loadDashboardData, 2000); // Refresh after 2 seconds
+            
+            // Start smart polling if syncs were triggered
+            if (data.triggered_count > 0 && data.triggered_mapping_ids) {
+                await pollForSyncCompletion(data.triggered_mapping_ids);
+            } else {
+                // No syncs triggered, just refresh immediately
+                loadDashboardData();
+            }
         } else {
             showAlert(data.detail || 'Failed to trigger sync', 'error');
         }
     } catch (error) {
         console.error('Error triggering sync:', error);
         showAlert('Error triggering sync', 'error');
+    } finally {
+        // Restore button state
+        triggerButton.disabled = false;
+        triggerButton.innerHTML = originalText;
+    }
+}
+
+/**
+ * Poll for sync completion using smart polling strategy
+ */
+async function pollForSyncCompletion(triggeredMappingIds, maxAttempts = 20) {
+    let attempts = 0;
+    const pollInterval = 500; // 500ms polling interval
+    let lastActiveSyncs = new Set(triggeredMappingIds);
+    
+    // Show sync progress indicator
+    showSyncProgressIndicator(triggeredMappingIds.length);
+    
+    const poll = async () => {
+        attempts++;
+        
+        try {
+            const response = await fetch('/api/sync/active');
+            if (!response.ok) {
+                throw new Error(`Polling failed: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const currentActiveSyncs = new Set(data.active_mapping_ids);
+            
+            // Check if any of our triggered syncs are still running
+            const ourActiveSyncs = triggeredMappingIds.filter(id => currentActiveSyncs.has(id));
+            
+            // Update progress indicator
+            updateSyncProgressIndicator(triggeredMappingIds.length - ourActiveSyncs.length, triggeredMappingIds.length);
+            
+            if (ourActiveSyncs.length === 0) {
+                // All our syncs are complete!
+                hideSyncProgressIndicator();
+                loadDashboardData();
+                showAlert('Sync operations completed', 'success');
+                return;
+            }
+            
+            // Continue polling if we haven't exceeded max attempts
+            if (attempts < maxAttempts) {
+                setTimeout(poll, pollInterval);
+            } else {
+                // Fallback: max attempts reached
+                hideSyncProgressIndicator();
+                loadDashboardData();
+                showAlert('Sync polling timeout - dashboard refreshed', 'warning');
+            }
+            
+        } catch (error) {
+            console.error('Polling error:', error);
+            
+            // Fallback on error
+            if (attempts < 3) {
+                // Retry a few times on error
+                setTimeout(poll, pollInterval * 2);
+            } else {
+                hideSyncProgressIndicator();
+                loadDashboardData();
+                showAlert('Sync status polling failed - dashboard refreshed', 'warning');
+            }
+        }
+    };
+    
+    // Start polling after a brief delay to allow sync to start
+    setTimeout(poll, 200);
+}
+
+/**
+ * Show sync progress indicator
+ */
+function showSyncProgressIndicator(totalSyncs) {
+    const existingIndicator = document.getElementById('sync-progress-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'sync-progress-indicator';
+    indicator.className = 'alert alert-info d-flex align-items-center';
+    indicator.innerHTML = `
+        <div class="spinner-border spinner-border-sm me-3" role="status">
+            <span class="visually-hidden">Syncing...</span>
+        </div>
+        <div>
+            <strong>Sync in progress...</strong>
+            <div class="progress mt-2" style="height: 6px; width: 300px;">
+                <div id="sync-progress-bar" class="progress-bar bg-info" role="progressbar"
+                     style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                </div>
+            </div>
+            <small class="text-muted mt-1 d-block">
+                <span id="sync-progress-text">Starting sync operations...</span>
+            </small>
+        </div>
+        <button type="button" class="btn-close ms-auto" onclick="hideSyncProgressIndicator()"></button>
+    `;
+    
+    const container = document.querySelector('main .container');
+    container.insertAdjacentElement('afterbegin', indicator);
+}
+
+/**
+ * Update sync progress indicator
+ */
+function updateSyncProgressIndicator(completed, total) {
+    const progressBar = document.getElementById('sync-progress-bar');
+    const progressText = document.getElementById('sync-progress-text');
+    
+    if (progressBar && progressText) {
+        const percentage = Math.round((completed / total) * 100);
+        progressBar.style.width = `${percentage}%`;
+        progressBar.setAttribute('aria-valuenow', percentage);
+        
+        if (completed === total) {
+            progressText.textContent = 'Sync operations completed!';
+        } else {
+            progressText.textContent = `${completed} of ${total} sync operations completed`;
+        }
+    }
+}
+
+/**
+ * Hide sync progress indicator
+ */
+function hideSyncProgressIndicator() {
+    const indicator = document.getElementById('sync-progress-indicator');
+    if (indicator) {
+        indicator.remove();
     }
 }
 

@@ -76,6 +76,7 @@ async def trigger_manual_sync(
                 "message": f"Triggered sync for {triggered_count} mappings",
                 "triggered_count": triggered_count,
                 "failed_mappings": failed_mappings,
+                "triggered_mapping_ids": [mid for mid in sync_request.mapping_ids if mid not in [f["mapping_id"] for f in failed_mappings]],
                 "triggered_at": datetime.utcnow().isoformat()
             }
         
@@ -83,9 +84,17 @@ async def trigger_manual_sync(
             # Trigger sync for all enabled mappings
             triggered_count = await scheduler.trigger_manual_sync_all()
             
+            # Get all enabled mapping IDs for tracking
+            with next(get_db()) as db:
+                enabled_mappings = db.query(CalendarMapping).filter(
+                    CalendarMapping.enabled == True
+                ).all()
+                triggered_mapping_ids = [m.id for m in enabled_mappings]
+            
             return {
                 "message": f"Triggered sync for {triggered_count} enabled mappings",
                 "triggered_count": triggered_count,
+                "triggered_mapping_ids": triggered_mapping_ids,
                 "triggered_at": datetime.utcnow().isoformat()
             }
         
@@ -449,3 +458,24 @@ async def cleanup_orphaned_jobs(
     except Exception as e:
         logger.error(f"Failed to cleanup orphaned jobs: {e}")
         raise HTTPException(status_code=500, detail="Failed to cleanup orphaned jobs")
+
+
+@router.get("/active")
+async def get_active_syncs(
+    request: Request,
+    _: bool = Depends(require_api_key_unless_localhost)
+):
+    """Get currently active sync operations (lightweight endpoint for polling)."""
+    try:
+        scheduler = get_sync_scheduler()
+        active_syncs = list(scheduler.active_jobs.keys())
+        
+        return {
+            "active_sync_count": len(active_syncs),
+            "active_mapping_ids": active_syncs,
+            "checked_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get active syncs: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve active sync status")

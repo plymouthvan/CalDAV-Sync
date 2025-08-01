@@ -481,6 +481,104 @@ function enableAutoSave(formId, key) {
     });
 }
 
+/**
+ * Smart polling for sync completion
+ */
+async function pollForSyncCompletion(triggeredMappingIds, options = {}) {
+    const {
+        maxAttempts = 20,
+        pollInterval = 500,
+        onProgress = null,
+        onComplete = null,
+        onError = null
+    } = options;
+    
+    let attempts = 0;
+    
+    const poll = async () => {
+        attempts++;
+        
+        try {
+            const response = await API.get('/sync/active');
+            const currentActiveSyncs = new Set(response.active_mapping_ids);
+            
+            // Check if any of our triggered syncs are still running
+            const ourActiveSyncs = triggeredMappingIds.filter(id => currentActiveSyncs.has(id));
+            const completed = triggeredMappingIds.length - ourActiveSyncs.length;
+            
+            // Call progress callback if provided
+            if (onProgress) {
+                onProgress(completed, triggeredMappingIds.length, ourActiveSyncs);
+            }
+            
+            if (ourActiveSyncs.length === 0) {
+                // All syncs complete
+                if (onComplete) {
+                    onComplete();
+                }
+                return;
+            }
+            
+            // Continue polling if we haven't exceeded max attempts
+            if (attempts < maxAttempts) {
+                setTimeout(poll, pollInterval);
+            } else {
+                // Timeout reached
+                if (onError) {
+                    onError(new Error('Polling timeout reached'));
+                }
+            }
+            
+        } catch (error) {
+            console.error('Polling error:', error);
+            
+            // Retry a few times on error
+            if (attempts < 3) {
+                setTimeout(poll, pollInterval * 2);
+            } else {
+                if (onError) {
+                    onError(error);
+                }
+            }
+        }
+    };
+    
+    // Start polling after a brief delay
+    setTimeout(poll, 200);
+}
+
+/**
+ * Enhanced trigger sync with smart polling
+ */
+async function triggerSyncWithPolling(mappingIds = null) {
+    try {
+        const requestBody = mappingIds ? { mapping_ids: mappingIds } : {};
+        const response = await API.post('/sync/trigger', requestBody);
+        
+        if (response.triggered_count > 0 && response.triggered_mapping_ids) {
+            return new Promise((resolve, reject) => {
+                pollForSyncCompletion(response.triggered_mapping_ids, {
+                    onComplete: () => {
+                        showAlert(`Sync completed for ${response.triggered_count} mappings`, 'success');
+                        resolve(response);
+                    },
+                    onError: (error) => {
+                        showAlert('Sync polling failed - please refresh manually', 'warning');
+                        resolve(response); // Still resolve, just with warning
+                    }
+                });
+            });
+        } else {
+            showAlert(response.message || 'No syncs were triggered', 'info');
+            return response;
+        }
+        
+    } catch (error) {
+        showAlert(error.message || 'Failed to trigger sync', 'error');
+        throw error;
+    }
+}
+
 // Export functions for use in other scripts
 window.CalDAVSync = {
     API,
@@ -491,5 +589,7 @@ window.CalDAVSync = {
     refreshCurrentPage,
     confirmAction,
     handleFormSubmit,
-    enableAutoSave
+    enableAutoSave,
+    pollForSyncCompletion,
+    triggerSyncWithPolling
 };
