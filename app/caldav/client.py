@@ -282,12 +282,61 @@ class CalDAVClient:
             if not calendar:
                 raise CalDAVCalendarNotFoundError(f"Calendar {calendar_id} not found")
             
-            # Find the existing event by UID
-            existing_events = calendar.search(uid=event.uid)
-            if not existing_events:
-                raise CalDAVEventError(f"Event {event.uid} not found for update")
+            # DIAGNOSTIC: Try different search approaches for iCloud compatibility
+            self.logger.info(f"CALDAV UPDATE DEBUG: Attempting to find event {event.uid}")
             
-            existing_event = existing_events[0]
+            # Try method 1: Direct UID search (current approach)
+            try:
+                existing_events = calendar.search(uid=event.uid)
+                self.logger.info(f"CALDAV UPDATE DEBUG: UID search returned {len(existing_events)} events")
+                if existing_events:
+                    existing_event = existing_events[0]
+                    self.logger.info(f"CALDAV UPDATE DEBUG: Found event via UID search")
+                else:
+                    raise CalDAVEventError(f"Event {event.uid} not found via UID search")
+            except Exception as search_error:
+                self.logger.error(f"CALDAV UPDATE DEBUG: UID search failed: {type(search_error).__name__}: {search_error}")
+                
+                # Try method 2: Get all events and filter by UID
+                try:
+                    self.logger.info(f"CALDAV UPDATE DEBUG: Trying alternative search method")
+                    from datetime import datetime, timedelta
+                    import pytz
+                    
+                    # Search in a wider date range
+                    start_date = datetime.now() - timedelta(days=365)
+                    end_date = datetime.now() + timedelta(days=365)
+                    if start_date.tzinfo is None:
+                        start_date = pytz.UTC.localize(start_date)
+                    if end_date.tzinfo is None:
+                        end_date = pytz.UTC.localize(end_date)
+                    
+                    all_events = calendar.date_search(start=start_date, end=end_date, expand=True)
+                    self.logger.info(f"CALDAV UPDATE DEBUG: Date search returned {len(all_events)} events")
+                    
+                    # Find our event by UID
+                    existing_event = None
+                    for cal_event in all_events:
+                        try:
+                            ical_data = cal_event.data
+                            parsed_events = CalDAVEvent.from_ical(ical_data)
+                            for parsed_event in parsed_events:
+                                if parsed_event.uid == event.uid:
+                                    existing_event = cal_event
+                                    self.logger.info(f"CALDAV UPDATE DEBUG: Found event via date search + UID filter")
+                                    break
+                            if existing_event:
+                                break
+                        except Exception as parse_error:
+                            self.logger.warning(f"CALDAV UPDATE DEBUG: Failed to parse event during search: {parse_error}")
+                            continue
+                    
+                    if not existing_event:
+                        raise CalDAVEventError(f"Event {event.uid} not found via alternative search")
+                        
+                except Exception as alt_search_error:
+                    self.logger.error(f"CALDAV UPDATE DEBUG: Alternative search failed: {type(alt_search_error).__name__}: {alt_search_error}")
+                    raise CalDAVEventError(f"Event {event.uid} not found via any search method")
             
             # Convert CalDAVEvent to iCal format
             ical_data = self._event_to_ical(event)
