@@ -233,7 +233,8 @@ async function loadDashboardData() {
         
         // Load recent activity
         try {
-            const activityResponse = await fetch('/api/sync/history?limit=5');
+            // Request more records to ensure we get enough meaningful activities after filtering
+            const activityResponse = await fetch('/api/sync/history?limit=50');
             if (!activityResponse.ok) throw new Error(`History API error: ${activityResponse.status}`);
             const activityData = await activityResponse.json();
             updateRecentActivity(activityData.results || []);
@@ -528,7 +529,10 @@ function updateRecentActivity(activities) {
         return totalChanges > 0 || activity.status === 'failure' || activity.status === 'partial_failure';
     });
     
-    if (meaningfulActivities.length === 0) {
+    // Limit to 5 most recent meaningful activities for dashboard display
+    const recentMeaningfulActivities = meaningfulActivities.slice(0, 5);
+    
+    if (recentMeaningfulActivities.length === 0) {
         activityContainer.innerHTML = `
             <div class="text-center text-muted">
                 <i class="bi bi-info-circle"></i>
@@ -540,7 +544,7 @@ function updateRecentActivity(activities) {
         return;
     }
     
-    const activityHtml = meaningfulActivities.map(activity => {
+    const activityHtml = recentMeaningfulActivities.map(activity => {
         // Fix status badge logic - only show "running" for actually running syncs
         let statusBadge, statusIcon, statusText;
         

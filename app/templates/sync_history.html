@@ -138,11 +138,14 @@ async function loadSyncHistory(page = 0) {
     showLoadingSpinner(true);
     
     try {
-        // Calculate 7 days ago
+        // Calculate 7 days ago for API filtering
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const startDate = sevenDaysAgo.toISOString();
         
-        const response = await fetch(`/api/sync/history?limit=${pageSize}&offset=${page * pageSize}`);
+        // Use a larger limit to get more records, then filter client-side for now
+        // TODO: Move filtering to API level for better performance
+        const response = await fetch(`/api/sync/history?limit=1000&offset=0`);
         if (!response.ok) throw new Error(`History API error: ${response.status}`);
         
         const data = await response.json();
@@ -155,11 +158,21 @@ async function loadSyncHistory(page = 0) {
             return activityDate >= cutoffDate && (totalChanges > 0 || activity.status === 'failure' || activity.status === 'partial_failure');
         });
         
+        // Apply client-side pagination to filtered results
+        const startIndex = page * pageSize;
+        const endIndex = startIndex + pageSize;
+        const paginatedResults = filteredResults.slice(startIndex, endIndex);
+        
         currentPage = page;
         totalCount = filteredResults.length;
         
-        updateSyncHistory(filteredResults);
-        updatePagination(data);
+        updateSyncHistory(paginatedResults);
+        updatePagination({
+            total_count: filteredResults.length,
+            has_more: endIndex < filteredResults.length,
+            limit: pageSize,
+            offset: startIndex
+        });
         updateHistoryCount(filteredResults.length);
         
     } catch (error) {
@@ -540,8 +553,21 @@ function showSyncProgressIndicator(totalSyncs) {
         <button type="button" class="btn-close ms-auto" onclick="hideSyncProgressIndicator()"></button>
     `;
     
-    const container = document.querySelector('main .container');
-    container.insertAdjacentElement('afterbegin', indicator);
+    // Find the container - try multiple selectors to be safe
+    let container = document.querySelector('main .container');
+    if (!container) {
+        container = document.querySelector('.container');
+    }
+    if (!container) {
+        container = document.querySelector('main');
+    }
+    if (!container) {
+        container = document.body;
+    }
+    
+    if (container) {
+        container.insertAdjacentElement('afterbegin', indicator);
+    }
 }
 
 function updateSyncProgressIndicator(completed, total) {
@@ -568,7 +594,7 @@ function hideSyncProgressIndicator() {
     }
 }
 
-// Alert function (reused from dashboard)
+// Alert function (fixed for sync history page structure)
 function showAlert(message, type) {
     const alertHtml = `
         <div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show" role="alert">
@@ -577,16 +603,33 @@ function showAlert(message, type) {
         </div>
     `;
     
-    const container = document.querySelector('main .container');
-    container.insertAdjacentHTML('afterbegin', alertHtml);
+    // Find the container - try multiple selectors to be safe
+    let container = document.querySelector('main .container');
+    if (!container) {
+        container = document.querySelector('.container');
+    }
+    if (!container) {
+        container = document.querySelector('main');
+    }
+    if (!container) {
+        // Fallback to body if nothing else works
+        container = document.body;
+    }
     
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-        const alert = container.querySelector('.alert');
-        if (alert) {
-            alert.remove();
-        }
-    }, 5000);
+    if (container) {
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            const alert = container.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
+        }, 5000);
+    } else {
+        // Fallback to console if DOM manipulation fails
+        console.log(`Alert: ${message} (${type})`);
+    }
 }
 </script>
 {% endblock %}
