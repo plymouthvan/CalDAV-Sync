@@ -100,7 +100,7 @@ class CalDAVEvent:
     def get_content_hash(self) -> str:
         """Generate a hash of the event content for change detection."""
         content_parts = [
-            self.uid,
+            self.uid or "",  # Ensure consistent handling of None values
             self.summary or "",
             self.description or "",
             self.location or "",
@@ -108,8 +108,8 @@ class CalDAVEvent:
             str(self.end) if self.end else "",
             str(self.all_day),
             self.timezone or "",
-            self.rrule or "",
-            self.recurrence_id or "",
+            self.rrule or "",  # This maps to Google's normalized recurrence
+            self.recurrence_id or "",  # This maps to Google's recurring_event_id
         ]
         
         content_string = "|".join(content_parts)

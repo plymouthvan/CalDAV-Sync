@@ -97,6 +97,12 @@ class GoogleCalendarEvent:
     
     def get_content_hash(self) -> str:
         """Generate a hash of the event content for change detection."""
+        # Normalize recurrence to match CalDAV format for consistent hashing
+        normalized_recurrence = ""
+        if self.recurrence:
+            # Convert Google recurrence list to single string (like CalDAV rrule)
+            normalized_recurrence = "|".join(self.recurrence)
+        
         content_parts = [
             self.uid or "",
             self.summary or "",
@@ -106,8 +112,8 @@ class GoogleCalendarEvent:
             str(self.end) if self.end else "",
             str(self.all_day),
             self.timezone or "",
-            "|".join(self.recurrence or []),
-            self.recurring_event_id or "",
+            normalized_recurrence,
+            self.recurring_event_id or "",  # This maps to CalDAV's recurrence_id
         ]
         
         content_string = "|".join(content_parts)
