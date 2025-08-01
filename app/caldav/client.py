@@ -297,16 +297,24 @@ class CalDAVClient:
     
     def update_event(self, calendar_id: str, event: CalDAVEvent) -> bool:
         """Update an existing event in the specified calendar."""
+        print(f"CALDAV UPDATE DEBUG: update_event called for {event.uid}")
+        self.logger.info(f"CALDAV UPDATE DEBUG: update_event called for {event.uid}")
+        
         try:
+            print(f"CALDAV UPDATE DEBUG: Getting calendar {calendar_id}")
             calendar = self.get_calendar_by_id(calendar_id)
             if not calendar:
+                print(f"CALDAV UPDATE DEBUG: Calendar {calendar_id} not found")
                 raise CalDAVCalendarNotFoundError(f"Calendar {calendar_id} not found")
             
+            print(f"CALDAV UPDATE DEBUG: Searching for event {event.uid}")
             # Find the existing event by UID
             existing_events = calendar.search(uid=event.uid)
             if not existing_events:
+                print(f"CALDAV UPDATE DEBUG: Event {event.uid} not found for update")
                 raise CalDAVEventError(f"Event {event.uid} not found for update")
             
+            print(f"CALDAV UPDATE DEBUG: Found {len(existing_events)} existing events")
             existing_event = existing_events[0]
             
             # COMPREHENSIVE DIAGNOSTIC: Log all available information
@@ -345,6 +353,7 @@ class CalDAVClient:
             return True
             
         except Exception as e:
+            print(f"CALDAV UPDATE DEBUG: Exception caught in update_event: {type(e).__name__}: {e}")
             self.logger.error(f"Failed to update event {event.uid}: {e}")
             raise CalDAVEventError(f"Failed to update event: {e}")
     
